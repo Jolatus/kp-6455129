@@ -17,20 +17,20 @@
      base: { basis: [Minuten, Art] }. Ausweichpunkte liegen an der Hauptstraße, dort nur in Parkbuchten halten. */
   const SPOTS = [
     { id: 'SH', name: 'Hof der Unterkunft', lat: 66.6363, lon: 25.3006, n: 1, d: 1, base: { sinetta: [0, 'vor der Tür'] } },
-    { id: 'S1', name: 'Lehtojärvi-Vogelturm', lat: 66.63703, lon: 25.31202, n: 2, d: 1, base: { sinetta: [1, 'Auto'] }, note: 'Treppe kann vereist sein.' },
+    { id: 'S1', name: 'Lehtojärvi-Vogelturm', lat: 66.63703, lon: 25.31202, n: 2, d: 1, lake: true, base: { sinetta: [1, 'Auto'] }, note: 'Treppe kann vereist sein.' },
     { id: 'SN', name: 'Straße 79 Richtung Kittilä', lat: 66.9548, lon: 25.3562, n: 2, d: 3, base: { sinetta: [35, 'Auto'] }, note: 'Ausweichpunkt, nur in einer Parkbucht halten.' },
 
-    { id: 'A1', name: 'Seeeis vor der Hütte', lat: 68.5128, lon: 23.3222, n: 3, d: 2, fire: true, base: { see: [3, 'zu Fuß'] } },
+    { id: 'A1', name: 'Seeeis vor der Hütte', lat: 68.5128, lon: 23.3222, n: 3, d: 2, lake: true, fire: true, base: { see: [3, 'zu Fuß'] } },
     { id: 'A2', name: 'Liljankivaara', lat: 68.52034, lon: 23.3312, n: 3, d: 3, base: { see: [45, 'zu Fuß'] }, noRec: true, note: 'Ohne markierten Weg. Nachts nur auf eurer eigenen Spur und bei Windstille, deshalb nie als Empfehlung.' },
     { id: 'A3', name: 'Parkplatz Straße nach Näkkälä', lat: 68.60383, lon: 23.52927, n: 3, d: 3, base: { see: [24, 'Auto'] } },
-    { id: 'H3', name: 'Ounasjärvi in Hetta', lat: 68.3759, lon: 23.5874, n: 2, d: 2, base: { see: [20, 'Auto'] } },
+    { id: 'H3', name: 'Ounasjärvi in Hetta', lat: 68.3759, lon: 23.5874, n: 2, d: 2, lake: true, base: { see: [20, 'Auto'] } },
     { id: 'A4', name: 'Jyppyrä-Kota in Hetta', lat: 68.4006, lon: 23.6673, n: 3, d: 2, fire: true, base: { see: [43, 'Auto + Fußweg'] } },
     { id: 'AP', name: 'Palojoensuu, Straße 93', lat: 68.284, lon: 23.081, n: 2, d: 3, base: { see: [40, 'Auto'] }, note: 'Ausweichpunkt im Südwesten, Parkbucht suchen.' },
     { id: 'AR', name: 'Straße Richtung Raattama', lat: 68.3912, lon: 24.202, n: 2, d: 3, base: { see: [45, 'Auto'] }, note: 'Ausweichpunkt im Osten, Parkbucht suchen.' },
 
     { id: 'F1', name: 'Hof mit Rentieren', lat: 67.77397, lon: 25.23808, n: 1, d: 1, base: { farm: [0, 'vor der Tür'] } },
-    { id: 'F2', name: 'Pollojärvi', lat: 67.7725, lon: 25.2250, n: 2, d: 2, base: { farm: [10, 'zu Fuß'] } },
-    { id: 'F3', name: 'Rastinjärvi', lat: 67.79139, lon: 25.26156, n: 3, d: 3, base: { farm: [3, 'Auto'] } },
+    { id: 'F2', name: 'Pollojärvi', lat: 67.7725, lon: 25.2250, n: 2, d: 2, lake: true, base: { farm: [10, 'zu Fuß'] } },
+    { id: 'F3', name: 'Rastinjärvi', lat: 67.79139, lon: 25.26156, n: 3, d: 3, lake: true, base: { farm: [3, 'Auto'] } },
     { id: 'F4', name: 'Laavu an der Vesmantie', lat: 67.8146, lon: 25.30573, n: 1, d: 3, fire: true, base: { farm: [7, 'Auto'] } },
     { id: 'FS', name: 'Straße 79 südlich von Kittilä', lat: 67.5551, lon: 24.9222, n: 2, d: 3, base: { farm: [50, 'Auto'] }, note: 'Ausweichpunkt, nur in einer Parkbucht halten.' },
     { id: 'L7', name: 'Levi-Gipfel', lat: 67.812, lon: 24.825, n: 2, d: 1, base: { farm: [55, 'Auto'], koengas: [19, 'Auto'] } },
@@ -62,18 +62,20 @@
     return hit ? hit[1] : null;
   }
 
-  /* Zeitfenster: „jetzt“ = aktuelle Stunde plus 3 h, „nacht“ = 16–02 Uhr Ortszeit */
-  function windowFor(mode, now) {
+  /* Zeitfenster: „jetzt“ = aktuelle Stunde plus 3 h, „nacht“ = 16–02 Uhr Ortszeit.
+     k = 0 heute Nacht, 1 morgen Nacht, 2 übermorgen */
+  const WD = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+  function windowFor(mode, now, k) {
     const h0 = Math.floor(now / HOUR) * HOUR;
     if (mode === 'jetzt') return { start: h0, end: h0 + 3 * HOUR, label: 'Nächste 3 Stunden' };
+    k = k || 0;
     const l = local(now);
-    let base;
-    if (l.h < 2) { const y = local(now - 12 * HOUR); base = [y.y, y.m, y.d]; }
-    else if (l.h < 12) { base = [l.y, l.m, l.d]; }
-    else { base = [l.y, l.m, l.d]; }
-    const start = localTime(base[0], base[1], base[2], 16);
+    const base = l.h < 2 ? local(now - 12 * HOUR) : l; /* nach Mitternacht zählt noch die laufende Nacht */
+    const start = localTime(base.y, base.m, base.d + k, 16);
     const end = start + 10 * HOUR; /* 16 bis 02 Uhr */
-    return { start: Math.max(start, h0), end, label: 'Heute Nacht' };
+    const ld = local(start + HOUR);
+    const label = k === 0 ? 'Heute Nacht' : k === 1 ? 'Morgen Nacht' : WD[new Date(Date.UTC(ld.y, ld.m - 1, ld.d)).getUTCDay()] + ' ' + String(ld.d).padStart(2, '0') + '.' + String(ld.m).padStart(2, '0') + '. Nacht';
+    return { start: k === 0 ? Math.max(start, h0) : start, end, label, k };
   }
 
   /* ---------- Sonnenhöhe (NOAA-Verfahren) ---------- */
@@ -172,8 +174,13 @@
         if (ov && isFinite(ov.valid) && t <= ov.valid + 30 * 60e3) { ovv = ovationNear(ov, loc.lat, loc.lon); pa = Math.max(pa, ovationFloor(ovv)); }
         /* Lokale Magnetometer (FMI-R-Index) sind die beste Aussage über „jetzt“ */
         if (o.actNow && now - o.actNow.t < 20 * 60e3 && lead >= 0 && lead <= 1) { const w = [0.7, 0.35][lead]; pa = (1 - w) * pa + w * o.actNow.p; }
-        let dc = null, eff = null;
-        if (di && di.has(t)) { const j = di.get(t); eff = effCloud(D.cloud_cover_low[j], D.cloud_cover_mid[j], D.cloud_cover_high[j]); dc = detClear(eff); }
+        let dc = null, eff = null, temp = null, feels = null, wind = null;
+        if (di && di.has(t)) {
+          const j = di.get(t); eff = effCloud(D.cloud_cover_low[j], D.cloud_cover_mid[j], D.cloud_cover_high[j]); dc = detClear(eff);
+          if (D.temperature_2m) temp = D.temperature_2m[j];
+          if (D.apparent_temperature) feels = D.apparent_temperature[j];
+          if (D.wind_speed_10m) wind = D.wind_speed_10m[j];
+        }
         /* Beobachtung der nächsten Wetterstation zieht die erste und zweite Stunde Richtung Wirklichkeit */
         const w = ob && now - ob.t < 75 * 60e3 ? (t <= now && now < t + HOUR ? 0.5 : t > now && t <= now + HOUR ? 0.25 : 0) : 0;
         let members = null, ec = null;
@@ -186,7 +193,7 @@
         if (w && dc != null) dc = (1 - w) * dc + w * ob.clear;
         const pcRaw = ec != null && dc != null ? 0.6 * ec + 0.4 * dc : ec != null ? ec : dc;
         const pc = pcRaw == null ? null : pcRaw * RELIABLE;
-        return { t, dark, kp: k, pa, ov: ovv, eff, dc, ec, members, pc, obsW: w, c: pc == null ? null : pc * pa * dark };
+        return { t, dark, kp: k, pa, ov: ovv, eff, dc, ec, members, pc, obsW: w, temp, feels, wind, c: pc == null ? null : pc * pa * dark };
       });
       const fEff = f0 + (1 - f0) * Math.max(0, Math.min(1, (kpMax - 3) / 3));
       const darkRows = rows.filter(r => r.dark > 0);
@@ -211,7 +218,11 @@
       const pClear = pClearRaw == null ? null : pClearRaw * RELIABLE;
       const pAur = darkRows.length ? Math.max(...darkRows.map(r => r.pa)) : 0;
       const best = rows.reduce((b, r) => (r.c != null && (!b || r.c > b.c) ? r : b), null);
-      return { loc, rows, chance, pClear, pAur, f: fEff, best: best && best.c > 0 ? best : null, dark: darkRows.length > 0, noData };
+      /* Kälte: tiefste Temperatur und tiefste gefühlte Temperatur im Fenster */
+      const temps = rows.filter(r => r.temp != null), feelsR = rows.filter(r => r.feels != null);
+      const tMin = temps.length ? Math.min(...temps.map(r => r.temp)) : null;
+      const feelsMin = feelsR.length ? Math.min(...feelsR.map(r => r.feels)) : null;
+      return { loc, rows, chance, pClear, pAur, f: fEff, best: best && best.c > 0 ? best : null, dark: darkRows.length > 0, noData, tMin, feelsMin, tFirst: temps.length ? temps[0].temp : null };
     });
   }
 
@@ -235,6 +246,26 @@
     const s = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon / 2) ** 2;
     return 2 * R * Math.asin(Math.sqrt(s));
   };
+
+  /* ---------- Klartext ---------- */
+  /* Ampel für die Chance */
+  function level(ch) {
+    if (ch == null) return { key: 'none', word: 'Keine Daten', short: '–' };
+    if (ch >= 0.55) return { key: 'gut', word: 'Gute Chance', short: 'gut' };
+    if (ch >= 0.3) return { key: 'mittel', word: 'Mittlere Chance', short: 'mittel' };
+    if (ch >= 0.1) return { key: 'klein', word: 'Kleine Chance', short: 'klein' };
+    return { key: 'nein', word: 'Kaum Chance', short: 'kaum' };
+  }
+  const skyWord = p => p == null ? 'unbekannt' : p >= 0.8 ? 'fast sicher klar' : p >= 0.6 ? 'meist klar' : p >= 0.35 ? 'wechselhaft' : 'wahrscheinlich bewölkt';
+  const auroraWord = p => p >= 0.9 ? 'stark, auch direkt über euch möglich' : p >= 0.6 ? 'aktiv, gut sichtbar' : p >= 0.35 ? 'ruhig, schwaches Licht im Norden möglich' : 'sehr ruhig';
+  /* Kleidung nach gefühlter Temperatur */
+  function coldAdvice(feels) {
+    if (feels == null) return '';
+    if (feels <= -30) return 'Extrem kalt: höchstens 20–30 Minuten still stehen, Nase und Finger auf weiße Flecken prüfen.';
+    if (feels <= -20) return 'Sehr kalt: alle Schichten, Gesicht schützen, Handwärmer und Thermoskanne mitnehmen.';
+    if (feels <= -10) return 'Kalt: dicke Jacke, Mütze, Fäustlinge, warme Schuhe.';
+    return 'Für Lappland mild: normale Winterkleidung reicht.';
+  }
 
   /* ---------- Weitere Quellen ---------- */
   /* NOAA geschätzter Kp der letzten Minuten: Mittel der letzten 30 Werte */
@@ -281,5 +312,5 @@
     return { rationale: r ? r[1].replace(/\s+/g, ' ').trim() : '', issued: issued.trim() };
   }
 
-  root.Radar = { TZ, HOUR, BASES, SPOTS, TRIP, local, localTime, baseForToday, windowFor, sunAlt, darkness, kpToP, parseKp, kpAt, reduceOvation, ovationNear, evaluate, recommend, haversineKm, effCloud, detClear, parseFmiObs, nearestObs, obsClear, parse27, parse3day, parseKpNow, RINDEX_THRESH, rIndexToP };
+  root.Radar = { TZ, HOUR, BASES, SPOTS, TRIP, local, localTime, baseForToday, windowFor, sunAlt, darkness, kpToP, parseKp, kpAt, reduceOvation, ovationNear, evaluate, recommend, haversineKm, effCloud, detClear, parseFmiObs, nearestObs, obsClear, parse27, parse3day, parseKpNow, RINDEX_THRESH, rIndexToP, level, skyWord, auroraWord, coldAdvice };
 })(typeof window !== 'undefined' ? window : globalThis);
