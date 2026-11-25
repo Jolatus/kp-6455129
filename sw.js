@@ -1,19 +1,39 @@
 /* Polarlicht-Radar: hält die App offline bereit und zeigt Benachrichtigungen des Weckers.
    Mit Netz kommt die Seite immer frisch vom Server, ohne Netz aus dem Speicher.
+   Kartenkacheln kommen aus dem Kartenpaket, das die App auf Knopfdruck speichert (pr-tiles-v1).
    Wetterdaten werden nicht hier zwischengespeichert, das macht die App selbst. */
-const CACHE = 'polarlicht-radar-v5';
-const SHELL = ['./', './index.html', './radar-core.js?v=4', './manifest.webmanifest', './icon-512.png'];
+const CACHE = 'polarlicht-radar-v6';
+const TILES = 'pr-tiles-v1';
+const SHELL = ['./', './index.html', './radar-core.js?v=5', './manifest.webmanifest', './icon-512.png'];
+/* Kartenbibliothek von cdnjs, damit die Karte auch ohne Netz startet */
+const LIBS = ['https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'];
 
 self.addEventListener('install', e => {
   /* cache: 'reload' umgeht den Browser-Cache, damit wirklich die neue Version gespeichert wird */
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then(c => Promise.all([
+    c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' }))),
+    Promise.all(LIBS.map(u => c.add(new Request(u, { mode: 'cors' })).catch(() => { /* Bibliothek später nachladen */ })))
+  ])).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+  /* alte App-Versionen löschen, das Kartenpaket behalten */
+  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE && k !== TILES).map(k => caches.delete(k)))).then(() => self.clients.claim()));
 });
 self.addEventListener('fetch', e => {
   const req = e.request, url = new URL(req.url);
-  if (req.method !== 'GET' || url.origin !== self.location.origin) return;
+  if (req.method !== 'GET') return;
+  /* Kartenkacheln: erst aus dem gespeicherten Paket, sonst aus dem Netz */
+  if (url.hostname === 'tile.openstreetmap.org') {
+    e.respondWith(caches.open(TILES).then(async c => (await c.match('https://tile.openstreetmap.org' + url.pathname)) || fetch(req).catch(() => new Response('', { status: 504 }))));
+    return;
+  }
+  if (LIBS.includes(url.href)) {
+    e.respondWith(caches.open(CACHE).then(async c => (await c.match(url.href)) || fetch(req)));
+    return;
+  }
+  if (url.origin !== self.location.origin) return;
+  /* Kartenpaket selbst nicht doppelt speichern, die App legt es in TILES ab */
+  if (/karte-offline\.(bin|json)$/.test(url.pathname)) return;
   /* Seite selbst: zuerst Netz (höchstens 5 Sekunden warten), sonst Speicher */
   if (req.mode === 'navigate') {
     e.respondWith((async () => {

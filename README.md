@@ -4,9 +4,10 @@ Eine Web-App für die Lappland-Reise: Sie sagt euch, wo ihr heute Nacht die best
 
 | Datei | Wozu |
 |---|---|
-| `index.html` | Die App: Empfehlung, Wolkenkarte, Spots, Wecker, Sonnensturm-Ausblick |
-| `radar-core.js` | Der Rechenkern, den App und Push-Wecker gemeinsam nutzen |
+| `index.html` | Die App: Ampel-Empfehlung mit Temperatur und Mond, nächste Nächte, Rückblick auf die letzten Nächte (gemessen), Wolken- und Temperaturkarte, Spots, Kamera-Tipps für Pixel 9 Pro und Pixel 8a, Wecker, Sonnensturm-Ausblick |
+| `radar-core.js` | Der Rechenkern, den App und Push-Wecker gemeinsam nutzen (auch Mond und Rückblick) |
 | `sw.js`, `manifest.webmanifest`, `icon-512.png` | Offline-Modus, Benachrichtigungen, Symbol auf dem Home-Bildschirm |
+| `karte-offline.bin`, `karte-offline.json` | Kartenpaket (304 OpenStreetMap-Kacheln, Zoom 7–11 rund um die Unterkünfte). Die App legt es per Knopf „Karte für Funklöcher speichern“ in den Offline-Speicher. © OpenStreetMap-Mitwirkende, ODbL |
 | `push/check.mjs` | Push-Wecker: prüft die Lage und schickt eine Nachricht über ntfy |
 | `.github/workflows/polarlicht-wecker.yml` | Startet den Push-Wecker abends alle 10 Minuten auf GitHub |
 

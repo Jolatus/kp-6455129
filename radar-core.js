@@ -74,7 +74,7 @@
     const start = localTime(base.y, base.m, base.d + k, 16);
     const end = start + 10 * HOUR; /* 16 bis 02 Uhr */
     const ld = local(start + HOUR);
-    const label = k === 0 ? 'Heute Nacht' : k === 1 ? 'Morgen Nacht' : WD[new Date(Date.UTC(ld.y, ld.m - 1, ld.d)).getUTCDay()] + ' ' + String(ld.d).padStart(2, '0') + '.' + String(ld.m).padStart(2, '0') + '. Nacht';
+    const label = k === 0 ? 'Heute Nacht' : k === 1 ? 'Morgen Nacht' : k === -1 ? 'Letzte Nacht' : WD[new Date(Date.UTC(ld.y, ld.m - 1, ld.d)).getUTCDay()] + ' ' + String(ld.d).padStart(2, '0') + '.' + String(ld.m).padStart(2, '0') + '. Nacht';
     return { start: k === 0 ? Math.max(start, h0) : start, end, label, k };
   }
 
@@ -98,6 +98,30 @@
   }
   /* 1 = dunkel genug, 0,5 = späte Dämmerung, 0 = zu hell */
   const darkness = alt => alt < -10 ? 1 : alt < -6 ? 0.5 : 0;
+
+  /* ---------- Mond: Höhe und beleuchteter Anteil (vereinfachte Bahnformeln, auf etwa 1° genau) ---------- */
+  const OBL = rad(23.4397);
+  const raOf = (l, b) => Math.atan2(Math.sin(l) * Math.cos(OBL) - Math.tan(b) * Math.sin(OBL), Math.cos(l));
+  const decOf = (l, b) => Math.asin(Math.sin(b) * Math.cos(OBL) + Math.cos(b) * Math.sin(OBL) * Math.sin(l));
+  function moonState(ms, lat, lon) {
+    const d = ms / 86400000 + 2440587.5 - 2451545;
+    const Ms = rad(357.5291 + 0.98560028 * d);
+    const Ls = Ms + rad(1.9148 * Math.sin(Ms) + 0.02 * Math.sin(2 * Ms) + 0.0003 * Math.sin(3 * Ms)) + rad(102.9372) + Math.PI;
+    const sDec = decOf(Ls, 0), sRa = raOf(Ls, 0);
+    const L = rad(218.316 + 13.176396 * d), M = rad(134.963 + 13.064993 * d), F = rad(93.272 + 13.22935 * d);
+    const l = L + rad(6.289) * Math.sin(M), b = rad(5.128) * Math.sin(F), dist = 385001 - 20905 * Math.cos(M);
+    const mRa = raOf(l, b), mDec = decOf(l, b);
+    const H = rad(280.16 + 360.9856235 * d) + rad(lon) - mRa, phi = rad(lat);
+    const alt = deg(Math.asin(Math.sin(phi) * Math.sin(mDec) + Math.cos(phi) * Math.cos(mDec) * Math.cos(H)));
+    const el = Math.acos(Math.sin(sDec) * Math.sin(mDec) + Math.cos(sDec) * Math.cos(mDec) * Math.cos(sRa - mRa));
+    const inc = Math.atan2(149598000 * Math.sin(el), dist - 149598000 * Math.cos(el));
+    const illum = (1 + Math.cos(inc)) / 2;
+    /* Mondlicht am Himmel: 0 = keins, 1 = heller Mond hoch am Himmel */
+    const light = alt <= -1 ? 0 : illum * Math.min(1, 0.4 + Math.max(0, alt) / 30);
+    return { alt, illum, light };
+  }
+  /* Heller Mond überstrahlt schwaches Polarlicht (bis −30 %), starkes kaum */
+  const moonFactor = (light, pa) => 1 - 0.3 * light * (1 - Math.max(0, Math.min(1, (pa - 0.6) / 0.35)));
 
   /* ---------- Polarlicht-Aktivität ---------- */
   /* Faustregel: Chance auf sichtbares Polarlicht bei klarem, dunklem Himmel.
@@ -193,7 +217,8 @@
         if (w && dc != null) dc = (1 - w) * dc + w * ob.clear;
         const pcRaw = ec != null && dc != null ? 0.6 * ec + 0.4 * dc : ec != null ? ec : dc;
         const pc = pcRaw == null ? null : pcRaw * RELIABLE;
-        return { t, dark, kp: k, pa, ov: ovv, eff, dc, ec, members, pc, obsW: w, temp, feels, wind, c: pc == null ? null : pc * pa * dark };
+        const moon = moonState(t + 30 * 60e3, loc.lat, loc.lon), mf = moonFactor(moon.light, pa);
+        return { t, dark, kp: k, pa, ov: ovv, eff, dc, ec, members, pc, obsW: w, temp, feels, wind, moon, mf, c: pc == null ? null : pc * pa * dark * mf };
       });
       const fEff = f0 + (1 - f0) * Math.max(0, Math.min(1, (kpMax - 3) / 3));
       const darkRows = rows.filter(r => r.dark > 0);
@@ -204,12 +229,12 @@
         let sum = 0, anyClear = 0;
         for (let m = 0; m < nMem; m++) {
           let best = 0, clr = 0;
-          darkRows.forEach(r => { if (r.members && r.members[m] != null) { best = Math.max(best, r.members[m] * r.pa * r.dark); clr = Math.max(clr, r.members[m]); } });
+          darkRows.forEach(r => { if (r.members && r.members[m] != null) { best = Math.max(best, r.members[m] * r.pa * r.dark * r.mf); clr = Math.max(clr, r.members[m]); } });
           sum += best; anyClear += clr;
         }
         cEns = sum / nMem; clearEns = anyClear / nMem;
       }
-      if (darkRows.some(r => r.dc != null)) cDet = Math.max(...darkRows.map(r => r.dc != null ? r.dc * r.pa * r.dark : 0));
+      if (darkRows.some(r => r.dc != null)) cDet = Math.max(...darkRows.map(r => r.dc != null ? r.dc * r.pa * r.dark * r.mf : 0));
       const detMaxClear = darkRows.some(r => r.dc != null) ? Math.max(...darkRows.map(r => r.dc != null ? r.dc : 0)) : null;
       const blend = (a, b) => a != null && b != null ? 0.6 * a + 0.4 * b : a != null ? a : b;
       const chanceRaw = blend(cEns, cDet);
@@ -296,6 +321,61 @@
     (stations || []).forEach(s => { const km = haversineKm({ lat, lon }, s); if (km <= (maxKm || 40) && (!best || km < best.km)) best = Object.assign({}, s, { km, clear: obsClear(s.n) }); });
     return best;
   }
+  /* ---------- Rückblick: gemessene Werte vergangener Nächte ---------- */
+  /* FMI „multipointcoverage“ (kompaktes Format): Stationen mit Namen und stündlichen Werten je Parameter */
+  function parseFmiSeries(xml) {
+    const s = String(xml || ''), names = {}; let m;
+    const reP = /<gml:Point gml:id="point-\d+"[^>]*>\s*<gml:name>([^<]+)<\/gml:name>\s*<gml:pos>([\d.]+) ([\d.]+)/g;
+    while ((m = reP.exec(s))) names[(+m[2]).toFixed(4) + ',' + (+m[3]).toFixed(4)] = m[1];
+    const fields = [...s.matchAll(/<swe:field name="([^"]+)"/g)].map(x => x[1]);
+    const list = re => ((s.match(re) || [])[1] || '').trim().split(/\s+/).filter(Boolean);
+    const pos = list(/<gmlcov:positions>([\s\S]*?)<\/gmlcov:positions>/), val = list(/<gml:doubleOrNilReasonTupleList>([\s\S]*?)<\/gml:doubleOrNilReasonTupleList>/);
+    const st = {};
+    for (let i = 0; i * 3 + 2 < pos.length; i++) {
+      const lat = +pos[i * 3], lon = +pos[i * 3 + 1], t = +pos[i * 3 + 2] * 1000, k = lat.toFixed(4) + ',' + lon.toFixed(4);
+      const o = st[k] || (st[k] = { name: names[k] || 'Wetterstation', lat, lon, v: {} });
+      fields.forEach((f, j) => { const x = parseFloat(val[i * fields.length + j]); if (isFinite(x)) (o.v[f] || (o.v[f] = {}))[t] = x; });
+    }
+    return Object.values(st);
+  }
+  /* Wie gut wäre eine vergangene Nacht gewesen? Gemessene Wolken und Temperatur der nächsten Station
+     mit Bewölkungsmessung, gemessener Kp, Sonne und Mond. win wie bei windowFor. */
+  function hindsight(o) {
+    const { stations, kp, lat, lon, win } = o;
+    const st = (stations || []).filter(s => s.v && s.v.n_man).map(s => Object.assign({}, s, { km: haversineKm({ lat, lon }, s) })).sort((a, b) => a.km - b.km)[0];
+    if (!st || st.km > 70) return { station: null, rows: [], best: null, chance: null };
+    /* Wert für die Stunde t…t+1: Mittel der Messungen zu Beginn und Ende */
+    const at = (p, t) => { const s2 = st.v[p] || {}, a = s2[t], b = s2[t + HOUR]; return a != null && b != null ? (a + b) / 2 : a != null ? a : b != null ? b : null; };
+    const rows = [];
+    for (let t = win.start; t < win.end; t += HOUR) {
+      const mid = t + 30 * 60e3, dark = darkness(sunAlt(mid, lat, lon));
+      const n = at('n_man', t), temp = at('t2m', t), k = kp && kp.length ? kpAt(kp, mid) : null, pa = k == null ? 0 : kpToP(k, lat);
+      const clear = n == null ? null : obsClear(n), moon = moonState(mid, lat, lon), mf = moonFactor(moon.light, pa);
+      rows.push({ t, n, temp, kp: k, pa, dark, clear, moon, c: clear == null || k == null ? null : clear * pa * dark * mf });
+    }
+    const ok = rows.filter(r => r.c != null);
+    const best = ok.reduce((b, r) => (!b || r.c > b.c ? r : b), null);
+    const darkRows = rows.filter(r => r.dark > 0);
+    const clearRows = darkRows.filter(r => r.clear != null && r.clear >= 0.75);
+    const temps = rows.filter(r => r.temp != null).map(r => r.temp);
+    return {
+      station: st, rows, best: best && best.c > 0 ? best : null, chance: ok.length ? (best ? best.c : 0) : null,
+      clearFrom: clearRows.length ? clearRows[0].t : null, clearTo: clearRows.length ? clearRows[clearRows.length - 1].t + HOUR : null,
+      clearShare: darkRows.filter(r => r.clear != null).length ? clearRows.length / darkRows.filter(r => r.clear != null).length : null,
+      kpMax: darkRows.some(r => r.kp != null) ? Math.max(...darkRows.filter(r => r.kp != null).map(r => r.kp)) : null,
+      tMin: temps.length ? Math.min(...temps) : null
+    };
+  }
+  /* Mond in Worten */
+  function moonWord(m) {
+    if (!m) return { cls: '', text: 'unbekannt' };
+    if (m.alt <= -1) return { cls: 'ok', text: 'nicht am Himmel, ideal' };
+    const p = Math.round(m.illum * 100);
+    const phase = m.illum >= 0.95 ? 'Vollmond' : m.illum >= 0.6 ? 'fast voll' : m.illum >= 0.35 ? 'Halbmond' : 'schmale Sichel';
+    const effect = m.light < 0.3 ? 'stört kaum' : m.light < 0.6 ? 'stört etwas' : 'überstrahlt schwaches Polarlicht';
+    return { cls: m.light < 0.3 ? 'ok' : 'mid', text: phase + ' (' + p + ' %), ' + (m.alt < 10 ? 'tief, ' : '') + effect };
+  }
+
   /* NOAA 27-Tage-Ausblick: Datum, Ap, größter Kp */
   const MON = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
   function parse27(txt) {
@@ -312,5 +392,5 @@
     return { rationale: r ? r[1].replace(/\s+/g, ' ').trim() : '', issued: issued.trim() };
   }
 
-  root.Radar = { TZ, HOUR, BASES, SPOTS, TRIP, local, localTime, baseForToday, windowFor, sunAlt, darkness, kpToP, parseKp, kpAt, reduceOvation, ovationNear, evaluate, recommend, haversineKm, effCloud, detClear, parseFmiObs, nearestObs, obsClear, parse27, parse3day, parseKpNow, RINDEX_THRESH, rIndexToP, level, skyWord, auroraWord, coldAdvice };
+  root.Radar = { TZ, HOUR, BASES, SPOTS, TRIP, local, localTime, baseForToday, windowFor, sunAlt, darkness, kpToP, parseKp, kpAt, reduceOvation, ovationNear, evaluate, recommend, haversineKm, effCloud, detClear, parseFmiObs, nearestObs, obsClear, parse27, parse3day, parseKpNow, RINDEX_THRESH, rIndexToP, level, skyWord, auroraWord, coldAdvice, moonState, moonFactor, moonWord, parseFmiSeries, hindsight };
 })(typeof window !== 'undefined' ? window : globalThis);

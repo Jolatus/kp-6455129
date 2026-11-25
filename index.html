@@ -129,7 +129,26 @@ p { margin: 0; }
 .night .w { font-size: 0.82rem; font-weight: 650; }
 .night small { font-size: 0.72rem; color: var(--muted); line-height: 1.3; overflow-wrap: anywhere; }
 
+/* Rückblick */
+.past-sum { font-size: 0.88rem; }
+.past-sum b { color: var(--chance); }
+.strip.past .col { grid-template-rows: auto 9px 9px 40px auto auto; }
+.strip .oct { font-family: var(--mono); font-size: 0.6rem; color: var(--clear); text-align: center; white-space: nowrap; }
+
+/* Kamera */
+.cam { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 0.85rem 0.9rem; display: grid; gap: 0.75rem; }
+.cam h3 { font-size: 0.92rem; font-weight: 700; margin-bottom: 0.35rem; }
+.cam .q { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.3rem; }
+.eye { font-size: 0.86rem; padding: 0.55rem 0.7rem; border-radius: 10px; background: color-mix(in srgb, var(--aurora) 14%, var(--raise)); }
+.steps { margin: 0; padding-left: 1.4rem; display: grid; gap: 0.5rem; font-size: 0.9rem; }
+.steps li::marker { color: var(--chance); font-weight: 800; }
+.tips { margin: 0; padding-left: 1.1rem; display: grid; gap: 0.3rem; font-size: 0.84rem; color: var(--muted); }
+.tips b { color: var(--ink); font-weight: 650; }
+
 /* Karte */
+.offline { display: grid; gap: 0.35rem; border-top: 1px solid var(--line); padding-top: 0.65rem; }
+.offline .go { justify-self: start; }
+.go:disabled { opacity: 0.5; cursor: default; }
 .mapbox { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
 #map { height: 420px; background: #0A0F18; }
 .map-ctl { display: grid; gap: 0.55rem; padding: 0.65rem 0.75rem 0.8rem; }
@@ -254,6 +273,14 @@ details.more .inner { display: grid; gap: 0.8rem; }
     <p class="small">Tippt auf eine Nacht, um sie oben anzuzeigen. Je weiter weg, desto unsicherer, besonders bei den Wolken.</p>
   </section>
 
+  <section class="block" aria-labelledby="h-past">
+    <h2 class="h" id="h-past">So waren die letzten Nächte</h2>
+    <p class="small">Gemessen statt vorhergesagt: Wolken und Temperatur von der nächsten Wetterstation, Polarlicht-Aktivität aus dem gemessenen Kp. So seht ihr, wie oft es hier aufklart und wie kalt die Nächte wirklich werden.</p>
+    <div class="nights" id="past"></div>
+    <p class="past-sum" id="past-sum"></p>
+    <div id="past-detail"></div>
+  </section>
+
   <section class="block" aria-labelledby="h-map">
     <h2 class="h" id="h-map">Karte</h2>
     <div class="mapbox">
@@ -273,6 +300,10 @@ details.more .inner { display: grid; gap: 0.8rem; }
         <div class="ramp" id="ramp"></div>
         <div class="mk-legend" id="mk-legend"></div>
         <ol class="howto" id="howto"></ol>
+        <div class="offline">
+          <button type="button" class="go ghost" id="off-save">Karte für Funklöcher speichern</button>
+          <p class="small" id="off-state"></p>
+        </div>
       </div>
     </div>
   </section>
@@ -280,6 +311,26 @@ details.more .inner { display: grid; gap: 0.8rem; }
   <section class="block" aria-labelledby="h-list">
     <h2 class="h" id="h-list">Alle Spots, beste zuerst</h2>
     <ol class="list" id="list"></ol>
+  </section>
+
+  <section class="block" aria-labelledby="h-cam">
+    <h2 class="h" id="h-cam">Polarlicht fotografieren mit euren Pixels</h2>
+    <div class="cam">
+      <div class="seg seg-2" role="group" aria-label="Welches Handy?" id="seg-phone">
+        <button type="button" data-phone="p9" aria-pressed="true">Pixel 9 Pro</button>
+        <button type="button" data-phone="p8a" aria-pressed="false">Pixel 8a</button>
+      </div>
+      <div>
+        <p class="q">Wie hell ist das Polarlicht gerade?</p>
+        <div class="seg seg-2" role="group" aria-label="Wie hell ist das Polarlicht?" id="seg-glow">
+          <button type="button" data-glow="schwach" aria-pressed="false">Blass</button>
+          <button type="button" data-glow="mittel" aria-pressed="false">Deutlich</button>
+          <button type="button" data-glow="stark" aria-pressed="false">Hell, tanzt</button>
+        </div>
+        <p class="small" id="cam-hint" style="margin-top:0.3rem"></p>
+      </div>
+      <div id="cam-out"></div>
+    </div>
   </section>
 
   <section class="block" aria-labelledby="h-wake">
@@ -323,6 +374,8 @@ details.more .inner { display: grid; gap: 0.8rem; }
         <li><b>Polarlicht aktiv:</b> Für später die Kp-Vorhersage von NOAA, umgerechnet auf die Breite des Spots. Für die laufende und nächste Stunde vor allem der gemessene Kp der letzten 30 Minuten, dazu Sonnenwind und OVATION.</li>
         <li><b>Dunkel:</b> Sonnenstand je Spot und Stunde. Unter −10° zählt voll, zwischen −10° und −6° halb.</li>
         <li><b>Spot:</b> Nordblick und Dunkelheit aus eurer Reiseseite, Faktor 0,6 bis 1,0.</li>
+        <li><b>Mond:</b> Höhe und Phase je Stunde. Ein heller, hoher Mond senkt die Chance bei schwachem Polarlicht um bis zu 30 %, bei starkem kaum.</li>
+        <li><b>Rückblick:</b> Gemessene Bewölkung und Temperatur der nächsten FMI-Station mit Wolkenmessung (bis 70 km), gemessener Kp von NOAA, Sonne und Mond. Dieselbe Rechnung wie vorwärts, nur mit Messungen statt Vorhersagen.</li>
         <li><b>Temperatur:</b> MET Nordic, gefühlte Temperatur mit Wind. Auf Seeeis und in Senken ist es in klaren Nächten oft 3–5 °C kälter.</li>
         <li><b>Chance:</b> Für jeden Ensemble-Lauf die beste dunkle Stunde (klar mal aktiv), gemittelt. Eine ehrliche Schätzung zum Vergleichen, keine geeichte Wahrscheinlichkeit.</li>
         <li><b>Ampel:</b> ab 55 % „Ja, raus!“, ab 30 % „Lohnt einen Blick“, ab 10 % „Eher nicht“, darunter „Heute nicht“.</li>
@@ -353,7 +406,7 @@ details.more .inner { display: grid; gap: 0.8rem; }
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="radar-core.js?v=4"></script>
+<script src="radar-core.js?v=5"></script>
 <script>
 (function () {
   'use strict';
@@ -376,7 +429,8 @@ details.more .inner { display: grid; gap: 0.8rem; }
   const state = {
     base: tripBase || store.get('base') || 'see',
     mode: store.get('mode') || 'nacht', night: 0,
-    gps: null, focus: null, data: store.get('data2'), loading: false, errors: []
+    gps: null, focus: null, data: store.get('data2'), loading: false, errors: [],
+    pastK: -1, phone: store.get('phone') || 'p9', glow: null, grid: store.get('grid')
   };
   if (state.base === 'gps' || !R.BASES[state.base]) state.base = 'see';
 
@@ -423,6 +477,13 @@ details.more .inner { display: grid; gap: 0.8rem; }
     return R.SPOTS.filter(s => s.base[state.base]).map(s => Object.assign({}, s, { min: s.base[state.base][0], how: s.base[state.base][1] }));
   }
   const locKey = locs => state.base + ':' + locs.map(l => l.id + '@' + l.lat + ',' + l.lon).join('|');
+  /* Rückblick: Messreihen der FMI-Stationen rund um den Standort, ab der drittletzten Nacht */
+  const histKey = () => { const c = center(); return c.lat.toFixed(2) + ',' + c.lon.toFixed(2); };
+  function histUrl(now) {
+    const c = center(), w3 = R.windowFor('nacht', now, -3);
+    const bbox = [c.lon - 1.2, c.lat - 0.5, c.lon + 1.2, c.lat + 0.5].map(v => v.toFixed(2)).join(',');
+    return 'https://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFeature&storedquery_id=fmi::observations::weather::multipointcoverage&bbox=' + bbox + '&parameters=n_man,t2m&timestep=60&starttime=' + iso(w3.start - R.HOUR) + '&endtime=' + iso(now);
+  }
 
   /* ---------- Daten laden ---------- */
   async function getData(url, type, ms) {
@@ -440,13 +501,14 @@ details.more .inner { display: grid; gap: 0.8rem; }
     if (state.loading) return;
     const locs = currentLocs(), key = locKey(locs);
     const d = state.data || {};
-    const fresh = d.at && Date.now() - d.at < 10 * 60e3 && d.key === key;
+    const fresh = d.at && Date.now() - d.at < 10 * 60e3 && d.key === key && d.hist && d.hist.key === histKey();
     if (fresh && !force) { render(); return; }
     state.loading = true; $('btn-refresh').disabled = true; setStamp('Lädt aktuelle Daten …');
     const now = Date.now();
     const la = locs.map(l => l.lat).join(','), lo = locs.map(l => l.lon).join(',');
     const om = 'latitude=' + la + '&longitude=' + lo + '&forecast_days=3&timezone=GMT';
     const slow = !d.out27At || now - d.out27At > 6 * 3600e3;
+    const hKey = histKey(), needHist = !d.hist || d.hist.key !== hKey || now - d.hist.at > 2 * 3600e3;
     const jobs = [
       getData('https://api.open-meteo.com/v1/forecast?' + om + '&hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high,temperature_2m,apparent_temperature,wind_speed_10m&models=metno_seamless'),
       getData('https://ensemble-api.open-meteo.com/v1/ensemble?' + om + '&hourly=cloud_cover&models=ecmwf_ifs025,icon_seamless', 'json', 35000),
@@ -457,11 +519,14 @@ details.more .inner { display: grid; gap: 0.8rem; }
       getData('https://services.swpc.noaa.gov/json/planetary_k_index_1m.json'),
       getData('https://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFeature&storedquery_id=fmi::observations::weather::simple&bbox=20,66,30,70.2&parameters=n_man&starttime=' + iso(now - 40 * 60e3) + '&endtime=' + iso(now), 'text'),
       slow ? getData('https://services.swpc.noaa.gov/text/27-day-outlook.txt', 'text') : Promise.resolve(null),
-      slow ? getData('https://services.swpc.noaa.gov/text/3-day-forecast.txt', 'text') : Promise.resolve(null)
+      slow ? getData('https://services.swpc.noaa.gov/text/3-day-forecast.txt', 'text') : Promise.resolve(null),
+      needHist ? getData(histUrl(now), 'text', 30000) : Promise.resolve(null)
     ];
     const res = await Promise.allSettled(jobs);
-    const [det, ens, kp, ov, mag, spd, k1m, obs, o27, d3] = res.map(r => r.status === 'fulfilled' ? r.value : null);
-    const errs = [], next = Object.assign({}, d);
+    const [det, ens, kp, ov, mag, spd, k1m, obs, o27, d3, hx] = res.map(r => r.status === 'fulfilled' ? r.value : null);
+    const next0 = {};
+    if (hx) next0.hist = { key: hKey, at: now, st: R.parseFmiSeries(hx).filter(s => s.v.n_man) };
+    const errs = [], next = Object.assign({}, d, next0);
     if (det && ens) { next.det = [].concat(det); next.ens = [].concat(ens); next.ids = locs.map(l => l.id); next.key = key; next.cloudsAt = now; }
     else errs.push('Wettervorhersage nicht erreichbar' + (d.cloudsAt && d.key === key ? ', zeige Stand von ' + clock(d.cloudsAt) : ''));
     if (kp) next.kp = R.parseKp(kp); else errs.push('Kp-Vorhersage nicht erreichbar');
@@ -563,6 +628,7 @@ details.more .inner { display: grid; gap: 0.8rem; }
       '<li class="' + cls(r.pClear, 0.6, 0.35) + '"><b>Himmel</b><span>' + esc(R.skyWord(r.pClear)) + ' (' + pct(r.pClear) + ')</span></li>' +
       '<li class="' + cls(r.pAur, 0.6, 0.35) + '"><b>Polarlicht</b><span>' + esc(R.auroraWord(r.pAur)) + '</span></li>' +
       '<li class="' + (r.dark ? 'ok' : 'bad') + '"><b>Dunkelheit</b><span>' + (dark0 ? (dark0 <= Date.now() ? 'jetzt dunkel genug' : 'dunkel ab ' + hh(dark0) + ' Uhr') : 'zu hell') + '</span></li>' +
+      (at && at.moon ? (mw => '<li class="' + mw.cls + '"><b>Mond</b><span>' + esc(mw.text) + '</span></li>')(R.moonWord(at.moon)) : '') +
       '<li class="' + (fAt == null ? '' : fAt > -20 ? 'ok' : fAt > -30 ? 'mid' : 'bad') + '"><b>Kälte</b><span>' + esc(R.coldAdvice(fAt)) + '</span></li></ul>';
     html += stripHTML(r);
     const notes = [];
@@ -589,10 +655,52 @@ details.more .inner { display: grid; gap: 0.8rem; }
       const active = state.mode === 'nacht' && state.night === k;
       if (!p) { out.push('<button type="button" class="night" data-k="' + k + '" aria-pressed="' + active + '"><span class="d">' + esc(win.label) + '</span><b>–</b><span class="w">keine Daten</span></button>'); continue; }
       const lv = R.level(p.r.chance);
-      out.push('<button type="button" class="night lv-' + lv.key + '" data-k="' + k + '" aria-pressed="' + active + '"><span class="d">' + esc(win.label) + '</span><b>' + pct(p.r.chance) + '</b><span class="w">' + esc(lv.word) + '</span><small>' + esc(p.r.loc.name) + (p.r.tMin != null ? ' · bis ' + deg(p.r.tMin) : '') + '</small></button>');
+      out.push('<button type="button" class="night lv-' + lv.key + '" data-k="' + k + '" aria-pressed="' + active + '"><span class="d">' + esc(win.label) + '</span><b>' + pct(p.r.chance) + '</b><span class="w">' + esc(lv.word) + '</span><small>' + esc(p.r.loc.name) + (p.r.tMin != null ? ' · bis ' + deg(p.r.tMin) : '') + (p.r.best && p.r.best.moon && p.r.best.moon.light >= 0.6 ? ' · Mond hell' : '') + '</small></button>');
     }
     $('nights').innerHTML = out.join('');
   }
+
+  /* ---------- Rückblick: die letzten drei Nächte, gemessen ---------- */
+  const PAST_WORD = { gut: 'Gute Nacht', mittel: 'Teils gut', klein: 'Eher schlecht', nein: 'Nichts zu sehen', none: 'Keine Messung' };
+  const tShort = v => v == null ? '' : (Math.round(v) < 0 ? '−' : '') + Math.abs(Math.round(v)) + '°';
+  function pastNights() {
+    const d = state.data || {}, c = center(), now = Date.now();
+    if (!d.hist || d.hist.key !== histKey()) return null;
+    return [-1, -2, -3].map(k => { const win = R.windowFor('nacht', now, k); return { k, win, h: R.hindsight({ stations: d.hist.st, kp: d.kp || [], lat: c.lat, lon: c.lon, win }) }; });
+  }
+  function renderPast() {
+    const el = $('past'), det = $('past-detail'), sum = $('past-sum');
+    const P = pastNights();
+    if (!P || !P[0].h.station) {
+      el.innerHTML = ''; sum.textContent = '';
+      det.innerHTML = '<p class="small">' + (!P ? (state.loading ? 'Messwerte werden geladen …' : 'Keine Messwerte geladen. „Neu laden“ versuchen.') : 'Keine Wetterstation mit Wolkenmessung im Umkreis von 70 km.') + '</p>';
+      return;
+    }
+    el.innerHTML = P.map(({ k, win, h }) => {
+      const lv = R.level(h.chance);
+      const sky = h.chance == null ? 'keine Messung' : h.clearShare != null && h.clearShare < 0.2 ? 'bewölkt' : h.clearFrom != null ? 'klar ' + hh(h.clearFrom) + '–' + hh(h.clearTo) + ' Uhr' : 'bewölkt';
+      return '<button type="button" class="night lv-' + lv.key + '" data-k="' + k + '" aria-pressed="' + (state.pastK === k) + '"><span class="d">' + esc(k === -1 ? 'Letzte Nacht' : win.label.replace(' Nacht', '')) + '</span><b>' + pct(h.chance) + '</b><span class="w">' + PAST_WORD[lv.key] + '</span>' +
+        '<small>' + esc(sky) + '<br>' + (h.kpMax != null ? 'Kp ' + num(h.kpMax, 0) + ' · ' : '') + (h.tMin != null ? 'bis ' + deg(h.tMin) : '') + '</small></button>';
+    }).join('');
+    const good = P.filter(p => p.h.chance != null && p.h.chance >= 0.3).length, cold = Math.min(...P.map(p => p.h.tMin != null ? p.h.tMin : 99));
+    sum.innerHTML = 'Im Nachhinein hätte sich Rausgehen in <b>' + good + ' von 3 Nächten</b> gelohnt.' + (cold < 99 ? ' Am kältesten war es mit ' + deg(cold) + '.' : '');
+    const sel = P.find(p => p.k === state.pastK) || P[0], h = sel.h;
+    const mo = (h.best || h.rows[Math.min(6, h.rows.length - 1)] || {}).moon;
+    det.innerHTML = '<div class="hours"><h3>' + esc(sel.k === -1 ? 'Letzte Nacht' : sel.win.label) + ': Stunde für Stunde gemessen</h3><div class="strip past" role="img" aria-label="Gemessene Werte Stunde für Stunde">' + h.rows.map(x => {
+      const light = x.dark === 0, best = h.best && x.t === h.best.t, cl = x.clear == null ? 0 : x.clear;
+      return '<div class="col' + (light ? ' light' : '') + (best ? ' best' : '') + '"><span class="hh">' + hh(x.t) + '</span>' +
+        '<span class="cell"><i style="background:var(--clear);opacity:' + (0.12 + cl * 0.88).toFixed(2) + '"></i></span>' +
+        '<span class="cell"><i style="background:var(--aurora);opacity:' + (0.12 + x.pa * 0.88).toFixed(2) + '"></i></span>' +
+        '<span class="cbar"><i style="height:' + (light || x.c == null ? 0 : Math.round(x.c * 100)) + '%"></i></span>' +
+        '<span class="oct">' + (x.n == null ? '–' : Math.round(x.n) + '/8') + '</span>' +
+        '<span class="tt">' + tShort(x.temp) + '</span></div>';
+    }).join('') + '</div><div class="legend"><span style="--c:var(--clear)">Himmel klar</span><span style="--c:var(--aurora)">Polarlicht aktiv</span><span style="--c:var(--chance)">Chance im Nachhinein</span><span style="--c:var(--cold)">Temperatur</span></div></div>' +
+      '<p class="note">Gemessen an der Wetterstation ' + esc(h.station.name) + ', ' + Math.round(h.station.km) + ' km entfernt. Bewölkung in Achteln: 0/8 = wolkenlos, 8/8 = ganz bedeckt.' + (mo ? ' Mond: ' + esc(R.moonWord(mo).text) + '.' : '') + '</p>';
+  }
+  $('past').addEventListener('click', e => {
+    const b = e.target.closest('.night'); if (!b) return;
+    state.pastK = +b.dataset.k; renderPast();
+  });
   $('nights').addEventListener('click', e => {
     const b = e.target.closest('.night'); if (!b) return;
     state.mode = 'nacht'; state.night = +b.dataset.k; state.focus = null; renderSeg(); render();
@@ -619,6 +727,104 @@ details.more .inner { display: grid; gap: 0.8rem; }
     state.focus = state.focus === b.dataset.id ? null : b.dataset.id; render();
     if (state.focus) $('ans').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
   });
+
+  /* ---------- Kamera: Pixel 9 Pro und Pixel 8a ---------- */
+  const CAM = {
+    p9: {
+      schwach: [
+        'Kamera-App, Modus <b>Nachtsicht</b>. Blitz aus.',
+        'Auf das Zeit-Symbol tippen und den Regler auf <b>Max</b> schieben. Ist der Bogen ganz ruhig und ihr wollt Sterne dazu: <b>Astro</b> (dauert bis 4 Minuten).',
+        'Auf den Horizont tippen, damit die Kamera auf weit weg scharf stellt. Die Helligkeit (Sonnen-Symbol) etwas runter.',
+        'Mehr Kontrolle: Modus <b>Foto</b>, Einstellungs-Symbol, Reiter <b>Pro</b>. <b>Verschlusszeit</b> so lang, wie der Regler geht (ideal 6–10 s), <b>ISO 1600–3200</b>, <b>Fokus</b> ganz auf unendlich.'
+      ],
+      mittel: [
+        'Kamera-App, Modus <b>Foto</b>, Einstellungs-Symbol, Reiter <b>Pro</b>.',
+        '<b>Verschlusszeit 3–5 s</b>, <b>ISO 800–1600</b>, <b>Fokus</b> ganz auf unendlich. Blitz aus.',
+        'Bild zu hell oder das Grün wird weiß: Verschlusszeit kürzer. Zu dunkel: ISO höher.',
+        'Im Pro-Reiter <b>RAW</b> einschalten, dann lassen sich die Fotos später besser bearbeiten.',
+        'Einfacher: Modus <b>Nachtsicht</b> auf Auto. Klappt auch gut, nur mit weniger Kontrolle.'
+      ],
+      stark: [
+        'Kamera-App, Modus <b>Foto</b>, Einstellungs-Symbol, Reiter <b>Pro</b>.',
+        '<b>Verschlusszeit 1–2 s</b>, <b>ISO 1600–3200</b>, <b>Fokus</b> ganz auf unendlich. Kurz belichten, sonst verschwimmen die Strahlen.',
+        'Füllt das Polarlicht den ganzen Himmel: auf <b>0,5×</b> wechseln, dann passt mehr aufs Bild.',
+        'Für Videos: Modus <b>Video</b> mit <b>Video Boost</b>. Google Fotos hellt das Video später im WLAN auf.'
+      ]
+    },
+    p8a: {
+      schwach: [
+        'Kamera-App, Modus <b>Nachtsicht</b>. Blitz aus.',
+        'Auf das Zeit-Symbol tippen und den Regler auf <b>Max</b> schieben. Ist der Bogen ganz ruhig und ihr wollt Sterne dazu: <b>Astro</b> (dauert bis 4 Minuten).',
+        'Auf den Horizont tippen, damit die Kamera auf weit weg scharf stellt. Die Helligkeit (Sonnen-Symbol) etwas runter, sonst wird der Himmel grau.'
+      ],
+      mittel: [
+        'Kamera-App, Modus <b>Nachtsicht</b>, Zeit-Regler auf <b>Auto</b>. Blitz aus.',
+        'Auf den Horizont tippen und die Helligkeit (Sonnen-Symbol) etwas runter.',
+        'Mehrere Fotos hintereinander machen. Bewegt sich das Polarlicht, ist meist eins davon scharf.'
+      ],
+      stark: [
+        'Kamera-App, Modus <b>Nachtsicht</b> auf Auto. Verwischen die Strahlen: in den normalen Modus <b>Foto</b> wechseln. Bei hellem Polarlicht reicht das, das Handy bleibt aufgelegt.',
+        'Die Helligkeit (Sonnen-Symbol) runter, damit das Grün nicht weiß wird.',
+        'Für Videos: Modus <b>Video</b>. Helles Polarlicht ist hell genug dafür.'
+      ]
+    }
+  };
+  const GLOW_WORD = { schwach: 'blasses Polarlicht', mittel: 'deutliches Polarlicht', stark: 'helles, tanzendes Polarlicht' };
+  function autoGlow() {
+    const p = pick(compute(R.windowFor('nacht', Date.now(), 0)));
+    const k = p && p.r.best ? p.r.best.kp : p && p.r.rows.length ? Math.max(...p.r.rows.map(x => x.kp || 0)) : null;
+    return { glow: k == null ? 'mittel' : k >= 4.5 ? 'stark' : k >= 2.5 ? 'mittel' : 'schwach', kp: k };
+  }
+  function renderCam() {
+    const a = autoGlow(), glow = state.glow || a.glow, phone = CAM[state.phone] ? state.phone : 'p9';
+    $('seg-phone').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.phone === phone)));
+    $('seg-glow').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.glow === glow)));
+    $('cam-hint').textContent = state.glow ? 'Von euch gewählt.' : 'Vorausgewählt nach der Vorhersage für heute Nacht' + (a.kp != null ? ' (Kp bis ' + num(a.kp, 0) + ')' : '') + '. Tippt um, wenn es draußen anders aussieht.';
+    const steps = ['Handy <b>fest hinlegen</b>: Mini-Stativ oder an Rucksack, Mütze oder Schneehaufen gelehnt, Kamera Richtung Norden. Aus der Hand wird es unscharf.',
+      '<b>Selbstauslöser auf 3 s</b> stellen. Dann wackelt nichts, wenn ihr auf den Auslöser tippt.']
+      .concat(CAM[phone][glow])
+      .concat(['Auslösen und das Handy in Ruhe lassen, bis die Kamera fertig ist. Mehrere Fotos machen.']);
+    $('cam-out').innerHTML = '<p class="eye"><b>Gut zu wissen:</b> Die Kamera sieht mehr als das Auge. Ein grauer Schleier im Norden ist auf dem Foto oft schon grün. Ein Testfoto lohnt sich immer.</p>' +
+      '<h3>' + (phone === 'p9' ? 'Pixel 9 Pro' : 'Pixel 8a') + ', ' + GLOW_WORD[glow] + '</h3><ol class="steps">' + steps.map(s => '<li>' + s + '</li>').join('') + '</ol>' +
+      '<h3 style="margin-top:0.8rem">Personen, Kälte, Akku</h3><ul class="tips">' +
+      '<li><b>Gruppenfoto:</b> Hauptkamera (1×), Nachtsicht, alle halten 3–5 Sekunden still. Eine schwache Lampe kurz von der Seite hilft.</li>' +
+      '<li><b>Akku:</b> Kälte leert ihn schnell. Handy zwischen den Fotos in die Innentasche, Powerbank mitnehmen. Bei −20 °C geht ein halbvolles Handy manchmal einfach aus.</li>' +
+      '<li><b>Linse:</b> nicht anhauchen, sie friert sofort zu.</li>' +
+      '<li><b>Drinnen:</b> das Handy 20–30 Minuten in der Jackentasche lassen, sonst beschlägt es.</li>' +
+      '<li><b>Augen:</b> Bildschirm dunkel und die Taste „Rotlicht“ oben nutzen, dann bleiben die Augen an die Nacht gewöhnt.</li></ul>';
+  }
+  $('seg-phone').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; state.phone = b.dataset.phone; store.set('phone', state.phone); renderCam(); });
+  $('seg-glow').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; state.glow = b.dataset.glow; renderCam(); });
+
+  /* ---------- Karte offline: Kartenpaket in den Speicher des Offline-Modus legen ---------- */
+  const TILE_CACHE = 'pr-tiles-v1';
+  const dayTxt = t => { const l = R.local(t); return String(l.d).padStart(2, '0') + '.' + String(l.m).padStart(2, '0') + '.'; };
+  function offState() {
+    const at = store.get('tilesAt'), b = $('off-save'), s = $('off-state');
+    if (!('caches' in window) || !('serviceWorker' in navigator) || !window.isSecureContext) { b.disabled = true; s.textContent = 'Geht nur in der Online-App.'; return; }
+    b.textContent = at ? 'Karte neu speichern' : 'Karte für Funklöcher speichern (3,9 MB)';
+    s.textContent = at ? 'Gespeichert am ' + dayTxt(at) + ': die Umgebung aller vier Unterkünfte, auch ohne Netz. Die Wolken zeigen offline den zuletzt geladenen Stand.'
+      : 'Speichert die Karte rund um alle vier Unterkünfte aufs Handy. Am besten jetzt im WLAN machen.';
+  }
+  async function saveOffline() {
+    const b = $('off-save'), s = $('off-state');
+    b.disabled = true; s.textContent = 'Lade Kartenpaket …';
+    try {
+      const [idx, bin] = await Promise.all([
+        fetch('karte-offline.json').then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }),
+        fetch('karte-offline.bin').then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
+      ]);
+      const c = await caches.open(TILE_CACHE), keys = Object.keys(idx.kacheln);
+      for (let i = 0; i < keys.length; i += 40) {
+        await Promise.all(keys.slice(i, i + 40).map(k => { const [o, l] = idx.kacheln[k]; return c.put('https://tile.openstreetmap.org/' + k + '.png', new Response(bin.slice(o, o + l), { headers: { 'Content-Type': 'image/png' } })); }));
+        s.textContent = 'Speichere … ' + Math.min(100, Math.round((i + 40) / keys.length * 100)) + ' %';
+      }
+      store.set('tilesAt', Date.now());
+      try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { /* Browser entscheidet selbst */ }
+    } catch (e) { b.disabled = false; s.textContent = 'Speichern hat nicht geklappt. Mit Netz noch einmal tippen.'; return; }
+    b.disabled = false; offState();
+  }
+  $('off-save').addEventListener('click', saveOffline);
 
   /* ---------- Technik ---------- */
   const kpWord = k => k >= 5 ? 'Sturm' : k >= 4 ? 'aktiv' : k >= 2 ? 'leicht aktiv' : 'ruhig';
@@ -744,13 +950,24 @@ details.more .inner { display: grid; gap: 0.8rem; }
     try {
       const j = await getData('https://api.open-meteo.com/v1/forecast?latitude=' + lats.join(',') + '&longitude=' + lons.join(',') + '&hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high,temperature_2m&models=metno_seamless&forecast_hours=13&timezone=GMT', 'json', 30000);
       const arr = [].concat(j), times = arr[0].hourly.time.map(t => Date.parse(t + 'Z'));
-      const eff = times.map((_, k) => arr.map(p => { const h = p.hourly; return R.effCloud(h.cloud_cover_low[k], h.cloud_cover_mid[k], h.cloud_cover_high[k]); }));
-      const temp = times.map((_, k) => arr.map(p => p.hourly.temperature_2m[k]));
+      const eff = times.map((_, k) => arr.map(p => { const h = p.hourly; return Math.round(R.effCloud(h.cloud_cover_low[k], h.cloud_cover_mid[k], h.cloud_cover_high[k])); }));
+      const temp = times.map((_, k) => arr.map(p => p.hourly.temperature_2m[k] == null ? null : Math.round(p.hourly.temperature_2m[k] * 10) / 10));
       state.grid = { key, at: Date.now(), NY, NX, latMin: c.lat - dLat, latMax: c.lat + dLat, lonMin: c.lon - dLon, lonMax: c.lon + dLon, times, eff, temp };
-      $('map-hour').min = 0; $('map-hour').max = times.length - 1; $('map-hour').value = 0;
+      store.set('grid', state.grid); /* für offline: letzter Stand der Wolkenkarte */
+      gridSlider(true);
       map.m.fitBounds([[c.lat - dLat * 0.8, c.lon - dLon * 0.8], [c.lat + dLat * 0.8, c.lon + dLon * 0.8]]);
       drawOverlay();
-    } catch (e) { $('map-hour-l').textContent = 'keine Daten'; }
+    } catch (e) {
+      /* ohne Netz: gespeicherten Stand zeigen, wenn er zum Standort passt */
+      if (g && g.key === key) { gridSlider(false); drawOverlay(); } else $('map-hour-l').textContent = 'keine Daten';
+    }
+  }
+  /* Regler auf die laufende Stunde stellen (bei altem Stand liegen die ersten Stunden in der Vergangenheit) */
+  function gridSlider(reset) {
+    const g = state.grid; if (!g) return;
+    const h0 = Math.floor(Date.now() / R.HOUR) * R.HOUR, i = g.times.findIndex(t => t >= h0);
+    $('map-hour').min = 0; $('map-hour').max = g.times.length - 1;
+    if (reset || +$('map-hour').value < i) $('map-hour').value = Math.max(0, i);
   }
   function drawOverlay() {
     if (!map.ready) return;
@@ -758,7 +975,8 @@ details.more .inner { display: grid; gap: 0.8rem; }
     const g = state.grid;
     if (!g || (map.layer !== 'cloud' && map.layer !== 'temp')) return;
     const k = Math.min(+$('map-hour').value, g.times.length - 1);
-    $('map-hour-l').textContent = (k === 0 ? 'jetzt ' : '') + hh(g.times[k]) + ' Uhr';
+    const h0 = Math.floor(Date.now() / R.HOUR) * R.HOUR;
+    $('map-hour-l').textContent = (g.times[k] === h0 ? 'jetzt ' : g.times[k] < h0 ? 'war ' : '') + hh(g.times[k]) + ' Uhr';
     const W = 256, H = 256, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
     const ctx = cv.getContext('2d'), img = ctx.createImageData(W, H);
     const red = document.documentElement.classList.contains('red');
@@ -883,7 +1101,7 @@ details.more .inner { display: grid; gap: 0.8rem; }
   function render() {
     renderSeg();
     const c = compute(); lastCompute = c;
-    renderAnswer(c); renderNights(); renderList(c); renderSW(c); renderLinks(); renderKp(); render27(); drawMarkers(c);
+    renderAnswer(c); renderNights(); renderPast(); renderList(c); renderCam(); renderSW(c); renderLinks(); renderKp(); render27(); drawMarkers(c);
     const d = state.data;
     if (state.loading) return;
     if (state.errors.length) setStamp(state.errors.join(' · '), true);
@@ -891,7 +1109,7 @@ details.more .inner { display: grid; gap: 0.8rem; }
   }
 
   setRed(!!store.get('red'));
-  initMap();
+  initMap(); gridSlider(true); offState();
   renderSeg(); render(); load(false); loadGrid();
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => { /* ohne Offline-Modus */ });
   setInterval(() => { if (!document.hidden && !watch.on) { load(false); loadGrid(); } }, 15 * 60e3);
