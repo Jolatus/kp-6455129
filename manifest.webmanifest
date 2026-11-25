@@ -1,0 +1,14 @@
+{
+  "name": "Polarlicht-Radar",
+  "short_name": "Polarlicht",
+  "description": "Wo und wann ihr in Lappland die beste Chance auf Polarlicht habt.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#05070D",
+  "theme_color": "#05070D",
+  "lang": "de",
+  "icons": [
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

@@ -1,0 +1,789 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#05070D">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<title>Polarlicht-Radar</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-512.png">
+<link rel="apple-touch-icon" href="icon-512.png">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+/* Nachtwerkzeug fürs Handy: eine Spalte, bewusst nur dunkel. Rotlicht-Modus schont die Dunkeladaption draußen. */
+:root {
+  color-scheme: dark;
+  --bg: #05070D; --surface: #0C1220; --raise: #131B2D; --line: #22304A;
+  --ink: #E8EEF8; --muted: #8E9BB3;
+  --clear: #6CC4E8;    /* Himmel klar */
+  --aurora: #5BE0A8;   /* Polarlicht-Aktivität */
+  --chance: #C6F26E;   /* Gesamtchance */
+  --warn: #F3A266;
+  --storm: #F07A8C;    /* geomagnetischer Sturm ab Kp 5 */
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
+}
+:root.red {
+  --bg: #000000; --surface: #0D0000; --raise: #150101; --line: #3A0B07;
+  --ink: #F0453A; --muted: #9C2A20; --clear: #B9271C; --aurora: #E0392D; --chance: #FF5547; --warn: #FF5547; --storm: #FF5547;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 var(--font); -webkit-font-smoothing: antialiased; }
+button, select { font: inherit; color: inherit; }
+a { color: var(--clear); text-underline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--chance); outline-offset: 2px; border-radius: 6px; }
+h1, h2, h3 { margin: 0; line-height: 1.15; text-wrap: balance; }
+p { margin: 0; }
+
+.app {
+  max-width: 560px; margin: 0 auto; display: grid; gap: 1.1rem;
+  padding: calc(env(safe-area-inset-top, 0px) + 1rem) max(16px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 2rem) max(16px, env(safe-area-inset-left, 0px));
+}
+.top { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.8rem; }
+.top h1 { font-size: 1.35rem; font-weight: 750; letter-spacing: -0.01em; }
+.stamp { font-size: 0.78rem; color: var(--muted); margin-top: 0.15rem; }
+.stamp.off { color: var(--warn); }
+.tools { display: flex; gap: 0.4rem; flex: none; }
+.tool { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 0.35rem 0.75rem; font-size: 0.82rem; cursor: pointer; }
+.tool[aria-pressed="true"] { border-color: var(--ink); }
+.tool:disabled { opacity: 0.5; }
+
+.seg { display: flex; gap: 0.3rem; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.seg::-webkit-scrollbar { display: none; }
+.seg button { flex: none; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 0.45rem 0.7rem; font-size: 0.86rem; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); font-weight: 650; }
+.seg button .today { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--aurora); margin-left: 0.35rem; vertical-align: 0.15em; }
+.seg-2 button { flex: 1 1 0; }
+
+/* ---------- Empfehlung ---------- */
+.rec { position: relative; isolation: isolate; overflow: hidden; border-radius: 18px; padding: 1.1rem 1.1rem 1rem; background: var(--surface); border: 1px solid var(--line); display: grid; gap: 0.75rem; }
+.rec::before { content: ""; position: absolute; inset: 0; z-index: -1; opacity: var(--glow, 0.35);
+  background: radial-gradient(120% 70% at 20% -20%, color-mix(in srgb, var(--aurora) 55%, transparent), transparent 60%), radial-gradient(90% 60% at 100% 0%, color-mix(in srgb, var(--clear) 35%, transparent), transparent 60%); }
+.eyebrow { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+.verdict { font-size: 1.45rem; font-weight: 780; letter-spacing: -0.01em; }
+.sub { color: var(--muted); font-size: 0.92rem; }
+.big { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; }
+.big b { font-size: clamp(3rem, 16vw, 4.4rem); font-weight: 800; line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; color: var(--chance); }
+.big span { color: var(--muted); font-size: 0.9rem; max-width: 12rem; }
+.factors { display: grid; gap: 0.4rem; }
+.fac { display: grid; grid-template-columns: 7.5rem 1fr 3.2rem; gap: 0.6rem; align-items: center; font-size: 0.84rem; }
+.fac .bar { height: 8px; border-radius: 4px; background: var(--raise); overflow: hidden; }
+.fac .bar i { display: block; height: 100%; border-radius: 4px; }
+.fac .v { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); font-size: 0.8rem; }
+.note { font-size: 0.86rem; padding: 0.55rem 0.7rem; border-radius: 10px; background: var(--raise); }
+.actions { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; }
+.go { display: inline-flex; align-items: center; gap: 0.4rem; text-decoration: none; font-weight: 650; background: var(--ink); color: var(--bg); padding: 0.5rem 0.9rem; border-radius: 10px; border: 0; cursor: pointer; }
+.go.ghost { background: var(--raise); color: var(--ink); border: 1px solid var(--line); }
+.linkbtn { background: none; border: 0; padding: 0; color: var(--clear); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; font-size: 0.9rem; }
+
+.strip { display: grid; gap: 3px; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+.strip .col { display: grid; grid-template-rows: auto 10px 10px 46px; gap: 3px; min-width: 0; }
+.strip .hh { font-family: var(--mono); font-size: 0.66rem; color: var(--muted); text-align: center; }
+.strip .cell { border-radius: 3px; background: var(--raise); position: relative; overflow: hidden; }
+.strip .cell i { position: absolute; inset: 0; }
+.strip .cbar { border-radius: 4px; background: var(--raise); display: flex; align-items: flex-end; overflow: hidden; }
+.strip .cbar i { display: block; width: 100%; background: var(--chance); border-radius: 4px 4px 0 0; }
+.strip .col.light .cbar { background: repeating-linear-gradient(135deg, var(--raise) 0 4px, transparent 4px 8px); }
+.strip .col.best .hh { color: var(--chance); font-weight: 700; }
+.legend { display: flex; flex-wrap: wrap; gap: 0.3rem 0.9rem; font-size: 0.74rem; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 2px; margin-right: 0.3rem; vertical-align: -0.1em; background: var(--c); }
+
+/* ---------- Blöcke ---------- */
+.block { display: grid; gap: 0.6rem; }
+.h { font-size: 1rem; font-weight: 700; }
+.lead { font-size: 0.86rem; color: var(--muted); }
+.sw { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.45rem; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 0.6rem 0.65rem; display: grid; gap: 0.1rem; align-content: start; min-width: 0; }
+.tile .l { font-family: var(--mono); font-size: 0.64rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.tile b { font-size: 1.3rem; font-weight: 780; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.tile small { font-size: 0.74rem; color: var(--muted); line-height: 1.3; }
+
+/* Karte */
+.mapbox { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+#map { height: 360px; background: #0A0F18; }
+.map-ctl { display: grid; gap: 0.5rem; padding: 0.65rem 0.75rem 0.75rem; }
+.map-ctl .seg button { font-size: 0.8rem; padding: 0.35rem 0.6rem; }
+.slider { display: grid; grid-template-columns: auto 1fr auto; gap: 0.6rem; align-items: center; font-size: 0.82rem; }
+.slider input { width: 100%; accent-color: var(--chance); }
+.slider b { font-family: var(--mono); font-variant-numeric: tabular-nums; min-width: 4.5rem; text-align: right; }
+.leaflet-container { font: 12px/1.4 var(--font); background: #0A0F18; }
+.night-tiles { filter: invert(1) hue-rotate(185deg) brightness(0.62) contrast(1.15) saturate(0.35); }
+.red .night-tiles { filter: grayscale(1) invert(1) brightness(0.35) sepia(1) hue-rotate(-45deg) saturate(5); }
+.leaflet-control-attribution { background: rgba(5, 7, 13, 0.7) !important; color: #8E9BB3 !important; }
+.leaflet-control-attribution a { color: #A9C4E8 !important; }
+.leaflet-tooltip.mk-tip { background: #0C1220; color: #E8EEF8; border: 1px solid #22304A; box-shadow: none; font-weight: 600; padding: 1px 6px; }
+.leaflet-tooltip.mk-tip::before { display: none; }
+.obs-mk { font: 700 10px/1 var(--mono); color: #05070D; background: #E8EEF8; border-radius: 4px; padding: 2px 3px; text-align: center; white-space: nowrap; }
+
+.list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.spot { width: 100%; text-align: left; display: grid; grid-template-columns: 1fr auto; gap: 0.15rem 0.8rem; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 0.6rem 0.75rem; cursor: pointer; }
+.spot[aria-pressed="true"] { border-color: var(--chance); }
+.spot .nm { font-weight: 650; min-width: 0; }
+.spot .mt { grid-column: 1; font-size: 0.78rem; color: var(--muted); min-width: 0; }
+.spot .pc { grid-row: 1 / span 2; grid-column: 2; text-align: right; font-weight: 800; font-size: 1.2rem; font-variant-numeric: tabular-nums; color: var(--chance); }
+.spot .spark { grid-column: 1 / -1; height: 18px; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 2px; align-items: end; margin-top: 0.25rem; }
+.spot .spark i { display: block; background: color-mix(in srgb, var(--chance) 75%, transparent); border-radius: 2px 2px 0 0; min-height: 1px; }
+.spot .spark i.light { background: var(--line); }
+.tag { display: inline-block; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--warn); margin-left: 0.3rem; }
+
+/* Wecker */
+.watch { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 0.85rem 0.9rem; display: grid; gap: 0.7rem; }
+.watch label { display: flex; align-items: center; gap: 0.6rem; font-size: 0.9rem; }
+.watch select { background: var(--raise); border: 1px solid var(--line); border-radius: 8px; padding: 0.3rem 0.5rem; }
+.small { font-size: 0.8rem; color: var(--muted); }
+.ov { position: fixed; inset: 0; z-index: 2000; background: #000; color: #9C2A20; display: grid; place-items: center; text-align: center; padding: calc(env(safe-area-inset-top, 0px) + 1.5rem) max(20px, env(safe-area-inset-right, 0px)) calc(env(safe-area-inset-bottom, 0px) + 1.5rem) max(20px, env(safe-area-inset-left, 0px)); }
+.ov .in { display: grid; gap: 1rem; max-width: 26rem; }
+.ov h2 { font-size: 1.1rem; font-weight: 700; color: #C2362A; }
+.ov p { font-size: 0.9rem; }
+.ov button { background: #150101; color: #F0453A; border: 1px solid #3A0B07; border-radius: 10px; padding: 0.6rem 1rem; font-weight: 650; cursor: pointer; }
+.ov.ring { animation: ring 1.1s steps(2) infinite; color: #FFFFFF; }
+.ov.ring h2 { font-size: 2rem; color: #FFFFFF; }
+.ov.ring button { background: #FFFFFF; color: #000; border: 0; font-size: 1.05rem; }
+@keyframes ring { 0% { background: #0B3D2A; } 50% { background: #000; } }
+@media (prefers-reduced-motion: reduce) { .ov.ring { animation: none; background: #0B3D2A; } }
+
+/* Sonnensturm-Ausblick */
+.chart { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 0.7rem 0.75rem; display: grid; gap: 0.4rem; }
+.chart svg { width: 100%; height: auto; display: block; }
+.chart text { font: 10px var(--mono); fill: var(--muted); }
+.rationale { font-size: 0.86rem; padding: 0.6rem 0.7rem; border-radius: 10px; background: var(--raise); }
+.rationale small { display: block; color: var(--muted); font-size: 0.74rem; margin-top: 0.2rem; }
+.days27 { display: grid; grid-template-columns: repeat(27, minmax(0, 1fr)); gap: 2px; align-items: end; height: 70px; }
+.days27 i { display: block; border-radius: 2px 2px 0 0; background: var(--aurora); opacity: 0.75; min-height: 3px; }
+.days27 i.trip { opacity: 1; background: var(--chance); }
+.days27 i.storm { background: var(--storm); opacity: 1; }
+.scale27 { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 0.66rem; color: var(--muted); }
+.lead-table { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; border-top: 1px solid var(--line); }
+.lead-table li { display: grid; grid-template-columns: 7.2rem 1fr; gap: 0.7rem; padding: 0.55rem 0; border-bottom: 1px solid var(--line); font-size: 0.86rem; }
+.lead-table b { font-family: var(--mono); font-size: 0.82rem; color: var(--chance); }
+.lead-table span { min-width: 0; color: var(--muted); }
+.lead-table span strong { color: var(--ink); font-weight: 650; }
+
+.links { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
+.links a { display: block; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 0.55rem 0.75rem; text-decoration: none; color: var(--ink); }
+.links small { display: block; color: var(--muted); font-size: 0.78rem; }
+details.how { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 0.7rem 0.8rem; }
+details.how summary { cursor: pointer; font-weight: 650; }
+details.how ul { margin: 0.6rem 0 0; padding-left: 1.1rem; display: grid; gap: 0.4rem; font-size: 0.88rem; color: var(--muted); }
+details.how b { color: var(--ink); }
+.foot { font-size: 0.74rem; color: var(--muted); display: grid; gap: 0.3rem; }
+</style>
+</head>
+<body>
+<main class="app">
+  <header class="top">
+    <div>
+      <h1>Polarlicht-Radar</h1>
+      <p class="stamp" id="stamp">Lädt aktuelle Daten …</p>
+    </div>
+    <div class="tools">
+      <button type="button" class="tool" id="btn-refresh">Neu laden</button>
+      <button type="button" class="tool" id="btn-red" aria-pressed="false">Rotlicht</button>
+    </div>
+  </header>
+
+  <div class="seg" role="group" aria-label="Standort" id="seg-base"></div>
+  <div class="seg seg-2" role="group" aria-label="Zeitraum" id="seg-mode">
+    <button type="button" data-mode="jetzt" aria-pressed="false">Nächste 3 Stunden</button>
+    <button type="button" data-mode="nacht" aria-pressed="false">Heute Nacht</button>
+  </div>
+
+  <section class="rec" id="rec" aria-live="polite">
+    <p class="eyebrow">Empfehlung</p>
+    <h2 class="verdict">Daten werden geladen</h2>
+    <p class="sub">Wolken, Polarlicht-Aktivität und Dunkelheit für alle Spots rund um eure Unterkunft.</p>
+  </section>
+
+  <section class="block" aria-labelledby="h-sw">
+    <h2 class="h" id="h-sw">Weltraumwetter</h2>
+    <div class="sw" id="sw"></div>
+  </section>
+
+  <section class="block" aria-labelledby="h-map">
+    <h2 class="h" id="h-map">Wolkenkarte</h2>
+    <div class="mapbox">
+      <div id="map" role="region" aria-label="Karte mit Wolken, Spots und Wetterstationen"></div>
+      <div class="map-ctl">
+        <div class="seg" role="group" aria-label="Kartenebene" id="seg-layer">
+          <button type="button" data-layer="model" aria-pressed="true">Wolken-Vorhersage</button>
+          <button type="button" data-layer="ir" aria-pressed="false">Satellit Infrarot</button>
+          <button type="button" data-layer="fog" aria-pressed="false">Satellit Nebel</button>
+        </div>
+        <div class="slider" id="map-slider">
+          <span>Stunde</span>
+          <input type="range" id="map-hour" min="0" max="11" step="1" value="0" aria-label="Vorhersagestunde">
+          <b id="map-hour-l">–</b>
+        </div>
+        <p class="small" id="map-note">Weiß sind Wolken, dunkel ist klarer Himmel. Kreise sind Spots in der Farbe ihrer Chance, Kästchen sind Wetterstationen mit gemessener Bewölkung in Achteln.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" aria-labelledby="h-list">
+    <h2 class="h" id="h-list">Alle Spots</h2>
+    <ol class="list" id="list"></ol>
+  </section>
+
+  <section class="block" aria-labelledby="h-wake">
+    <h2 class="h" id="h-wake">Polarlicht-Wecker</h2>
+    <div class="watch">
+      <p class="lead">Die App prüft alle 10 Minuten die laufende und die nächste Stunde und klingelt, wenn die Chance über eurer Schwelle liegt. Dafür bleibt das Handy mit offener App am Ladekabel liegen. Der Bildschirm bleibt an, aber fast schwarz.</p>
+      <label for="w-th">Wecken ab
+        <select id="w-th">
+          <option value="0.3">30 %</option>
+          <option value="0.4">40 %</option>
+          <option value="0.45">45 %</option>
+          <option value="0.55" selected>55 %</option>
+          <option value="0.65">65 %</option>
+        </select>
+      </label>
+      <div class="actions">
+        <button type="button" class="go" id="w-start">Wache starten</button>
+        <button type="button" class="go ghost" id="w-test">Probealarm</button>
+      </div>
+      <p class="small">Klingeln ohne offene App geht über einen Push-Wecker auf GitHub mit der App ntfy. Der nutzt zusätzlich die Magnetometer des finnischen Wetterdienstes. Die Einrichtung steht in der Datei README.md.</p>
+    </div>
+  </section>
+
+  <section class="block" aria-labelledby="h-storm">
+    <h2 class="h" id="h-storm">Sonnensturm-Ausblick</h2>
+    <div class="chart" id="kp-chart"><p class="small">Kp-Verlauf lädt …</p></div>
+    <div class="rationale" id="rationale"></div>
+    <div class="chart" id="out27"><p class="small">27-Tage-Ausblick lädt …</p></div>
+    <ul class="lead-table" aria-label="Wie lange Sonnenstürme zur Erde brauchen">
+      <li><b>8 Minuten</b><span><strong>Licht eines Flares.</strong> Kein Polarlicht, aber ein Hinweis, dass ein Sturm folgen kann.</span></li>
+      <li><b>20 Min.–Stunden</b><span><strong>Teilchenstrahlung.</strong> Betrifft Satelliten und Funk, macht kein Polarlicht.</span></li>
+      <li><b>15 Std.–4 Tage</b><span><strong>Koronaler Massenauswurf (CME), meist 2–3 Tage.</strong> Die Ankunft ist auf etwa ±10 Stunden vorhersagbar. Wie stark es wird, weiß man erst, wenn die Wolke am Messpunkt L1 ankommt.</span></li>
+      <li><b>2–4 Tage</b><span><strong>Schneller Sonnenwind aus einem koronalen Loch.</strong> Kehrt mit der Sonnendrehung alle 27 Tage wieder, deshalb der 27-Tage-Ausblick.</span></li>
+      <li><b>15–60 Minuten</b><span><strong>Messung am Punkt L1</strong>, 1,5 Mio. km vor der Erde. Zeigt das Magnetfeld Bz nach Süden, geht es bald los. Das ist die verlässlichste Vorwarnung.</span></li>
+    </ul>
+  </section>
+
+  <section class="block" aria-labelledby="h-live">
+    <h2 class="h" id="h-live">Live nachschauen</h2>
+    <ul class="links" id="links"></ul>
+  </section>
+
+  <details class="how">
+    <summary>So rechnet das Radar</summary>
+    <ul>
+      <li><b>Himmel klar:</b> 91 Läufe aus zwei Ensemble-Modellen (ECMWF mit 51, ICON mit 40), gezählt wird der Anteil mit unter 40 % Bewölkung. Dazu kommt das 1-km-Modell MET Nordic mit tiefen, mittleren und hohen Wolken getrennt. Dünne hohe Wolken zählen wenig. Davon gehen 8 % ab, weil Eisnebel und tiefe Wolken über kaltem Schnee in den Modellen oft fehlen.</li>
+      <li><b>Gemessene Wolken:</b> Meldet eine Wetterstation des finnischen Wetterdienstes im Umkreis von 40 km, zieht ihre aktuelle Bewölkung die laufende Stunde zur Hälfte und die nächste zu einem Viertel Richtung Wirklichkeit.</li>
+      <li><b>Polarlicht aktiv:</b> Für später zählt die Kp-Vorhersage von NOAA, umgerechnet auf die Breite des Spots. Faustregel nach dem finnischen Wetterdienst: Bei 68–69° N gibt es in etwa drei von vier klaren Nächten Polarlicht. Für die laufende und die nächste Stunde zählt vor allem der gemessene Kp der letzten 30 Minuten, dazu Sonnenwind (Bz) und der OVATION-Nowcast.</li>
+      <li><b>Dunkel:</b> Sonnenstand je Spot und Stunde. Unter −10° zählt voll, zwischen −10° und −6° halb.</li>
+      <li><b>Spot:</b> Nordblick und Dunkelheit aus eurer Reiseseite, Faktor 0,6 bis 1,0. Bei starkem Polarlicht zählt der Spot weniger, weil es dann über euch steht.</li>
+      <li><b>Chance:</b> Für jeden Ensemble-Lauf die beste dunkle Stunde (klar mal aktiv), dann gemittelt. Das ist keine geeichte Wahrscheinlichkeit, sondern eine ehrliche Schätzung, um Spots und Abende zu vergleichen.</li>
+      <li><b>Fahren lohnt</b>, wenn ein Spot mindestens 8 Punkte besser ist als der Platz vor der Tür. Jede Minute Fahrt kostet in der Wertung etwas.</li>
+    </ul>
+  </details>
+
+  <footer class="foot">
+    <p>Wetterdaten: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0) mit Modellen von MET Norway, ECMWF und DWD. Beobachtungen: <a href="https://en.ilmatieteenlaitos.fi/open-data" target="_blank" rel="noopener">Finnischer Wetterdienst (FMI)</a>, CC BY 4.0. Satellit: <a href="https://view.eumetsat.int/" target="_blank" rel="noopener">EUMETSAT</a>. Polarlicht, Kp und Sonnenwind: <a href="https://www.swpc.noaa.gov/" target="_blank" rel="noopener">NOAA SWPC</a>. Karte: © OpenStreetMap-Mitwirkende.</p>
+    <p>Alle Zeiten sind finnische Ortszeit. Nur in Parkbuchten halten, nie am Straßenrand.</p>
+  </footer>
+</main>
+
+<div class="ov" id="ov" hidden>
+  <div class="in">
+    <h2 id="ov-t">Wache läuft</h2>
+    <p id="ov-m">Handy ans Ladekabel legen. Die App prüft alle 10 Minuten.</p>
+    <div class="actions" style="justify-content:center">
+      <button type="button" id="ov-snooze" hidden>30 Min. später</button>
+      <button type="button" id="ov-stop">Wache beenden</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="radar-core.js"></script>
+<script>
+(function () {
+  'use strict';
+  const R = window.Radar;
+  const $ = id => document.getElementById(id);
+  const store = {
+    get(k) { try { return JSON.parse(localStorage.getItem('pr-' + k)); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem('pr-' + k, JSON.stringify(v)); } catch (e) { /* Speicher voll oder gesperrt: ohne Cache weiter */ } }
+  };
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const pct = v => v == null ? '–' : v < 0.05 ? '< 5 %' : Math.round(v * 20) * 5 + ' %';
+  const num = (v, d) => v == null || !isFinite(v) ? '–' : v.toFixed(d).replace('.', ',');
+  const hh = t => String(R.local(t).h).padStart(2, '0');
+  const clock = t => { const l = R.local(t); return String(l.h).padStart(2, '0') + ':' + String(l.min).padStart(2, '0'); };
+  const iso = ms => new Date(ms).toISOString().replace(/\.\d+Z$/, 'Z');
+
+  const tripBase = R.baseForToday(Date.now());
+  const state = {
+    base: tripBase || store.get('base') || 'see',
+    mode: store.get('mode') || 'nacht',
+    gps: null, focus: null, data: store.get('data'), loading: false, errors: [], last: null
+  };
+  if (state.base === 'gps') state.base = 'see';
+
+  /* ---------- Rotlicht ---------- */
+  const setRed = on => { document.documentElement.classList.toggle('red', on); $('btn-red').setAttribute('aria-pressed', String(on)); document.querySelector('meta[name="theme-color"]').content = on ? '#000000' : '#05070D'; store.set('red', on); if (map.ready) drawModel(); };
+  $('btn-red').addEventListener('click', () => setRed(!document.documentElement.classList.contains('red')));
+
+  /* ---------- Auswahl ---------- */
+  function renderSeg() {
+    const opts = Object.keys(R.BASES).map(k => [k, R.BASES[k].short]).concat([['gps', 'Mein Standort']]);
+    $('seg-base').innerHTML = opts.map(([k, n]) => '<button type="button" data-base="' + k + '" aria-pressed="' + (state.base === k) + '">' + esc(n) + (k === tripBase ? '<span class="today" title="heute"></span>' : '') + '</button>').join('');
+    $('seg-mode').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.mode === state.mode)));
+  }
+  $('seg-base').addEventListener('click', e => {
+    const btn = e.target.closest('button'); if (!btn) return;
+    const k = btn.dataset.base; state.focus = null;
+    if (k === 'gps') { locate(); return; }
+    state.base = k; store.set('base', k); renderSeg(); render(); loadGrid();
+  });
+  $('seg-mode').addEventListener('click', e => {
+    const btn = e.target.closest('button'); if (!btn) return;
+    state.mode = btn.dataset.mode; store.set('mode', state.mode); renderSeg(); render();
+  });
+
+  function locate() {
+    if (!navigator.geolocation) { state.errors = ['Dieses Gerät gibt keinen Standort heraus.']; render(); return; }
+    setStamp('Standort wird bestimmt …');
+    navigator.geolocation.getCurrentPosition(p => {
+      state.gps = { lat: +p.coords.latitude.toFixed(3), lon: +p.coords.longitude.toFixed(3) };
+      state.base = 'gps'; renderSeg(); load(true); loadGrid();
+    }, () => { state.errors = ['Standort nicht freigegeben. Erlaubt den Standort im Browser oder wählt eine Unterkunft.']; renderSeg(); render(); }, { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 });
+  }
+
+  /* ---------- Orte ---------- */
+  function allLocs() {
+    const list = R.SPOTS.map(s => ({ id: s.id, lat: s.lat, lon: s.lon }));
+    if (state.gps) list.push({ id: 'GPS', lat: state.gps.lat, lon: state.gps.lon });
+    return list;
+  }
+  function center() { return state.base === 'gps' && state.gps ? state.gps : R.BASES[state.base] || R.BASES.see; }
+  function currentLocs() {
+    if (state.base === 'gps' && state.gps) {
+      const here = { id: 'GPS', name: 'Euer Standort', lat: state.gps.lat, lon: state.gps.lon, n: 2, d: 2, min: 0, how: 'hier' };
+      const near = R.SPOTS.map(s => Object.assign({}, s, { km: R.haversineKm(state.gps, s) }))
+        .filter(s => s.km <= 120).sort((a, b) => a.km - b.km)
+        .map(s => Object.assign(s, { min: Math.max(1, Math.round(s.km * 1.35 / 65 * 60)), how: 'Auto, geschätzt' }));
+      return [here].concat(near);
+    }
+    return R.SPOTS.filter(s => s.base[state.base]).map(s => Object.assign({}, s, { min: s.base[state.base][0], how: s.base[state.base][1] }));
+  }
+
+  /* ---------- Daten laden ---------- */
+  async function getData(url, type, ms) {
+    const c = new AbortController(), t = setTimeout(() => c.abort(), ms || 25000);
+    try {
+      const r = await fetch(url, { signal: c.signal });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      if (type === 'text') return await r.text();
+      const j = await r.json(); if (j && j.error) throw new Error(j.reason || 'Fehler'); return j;
+    } finally { clearTimeout(t); }
+  }
+  function setStamp(txt, off) { const s = $('stamp'); s.textContent = txt; s.classList.toggle('off', !!off); }
+
+  async function load(force) {
+    if (state.loading) return;
+    const locs = allLocs(), key = locs.map(l => l.id).join(',');
+    const d = state.data || {};
+    const fresh = d.at && Date.now() - d.at < 10 * 60e3 && d.key === key;
+    if (fresh && !force) { render(); return; }
+    state.loading = true; $('btn-refresh').disabled = true; setStamp('Lädt aktuelle Daten …');
+    const now = Date.now();
+    const la = locs.map(l => l.lat).join(','), lo = locs.map(l => l.lon).join(',');
+    const om = 'latitude=' + la + '&longitude=' + lo + '&past_days=1&forecast_days=2&timezone=GMT';
+    const slow = !d.out27At || now - d.out27At > 6 * 3600e3; /* Ausblicke nur alle 6 Stunden */
+    const jobs = [
+      getData('https://api.open-meteo.com/v1/forecast?' + om + '&hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high&models=metno_seamless'),
+      getData('https://ensemble-api.open-meteo.com/v1/ensemble?' + om + '&hourly=cloud_cover&models=ecmwf_ifs025,icon_seamless'),
+      getData('https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json'),
+      getData('https://services.swpc.noaa.gov/json/ovation_aurora_latest.json', 'json', 40000),
+      getData('https://services.swpc.noaa.gov/products/summary/solar-wind-mag-field.json'),
+      getData('https://services.swpc.noaa.gov/products/summary/solar-wind-speed.json'),
+      getData('https://services.swpc.noaa.gov/json/planetary_k_index_1m.json'),
+      getData('https://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFeature&storedquery_id=fmi::observations::weather::simple&bbox=20,66,30,70.2&parameters=n_man&starttime=' + iso(now - 40 * 60e3) + '&endtime=' + iso(now), 'text'),
+      slow ? getData('https://services.swpc.noaa.gov/text/27-day-outlook.txt', 'text') : Promise.resolve(null),
+      slow ? getData('https://services.swpc.noaa.gov/text/3-day-forecast.txt', 'text') : Promise.resolve(null)
+    ];
+    const res = await Promise.allSettled(jobs);
+    const ok = i => res[i].status === 'fulfilled' ? res[i].value : null;
+    const errs = [];
+    const next = Object.assign({}, d);
+    const [det, ens, kp, ov, mag, spd, k1m, obs, o27, d3] = res.map((_, i) => ok(i));
+    if (det && ens) { next.det = [].concat(det); next.ens = [].concat(ens); next.ids = locs.map(l => l.id); next.key = key; next.cloudsAt = now; }
+    else errs.push('Wolkenvorhersage nicht erreichbar' + (d.cloudsAt ? ', zeige Stand von ' + clock(d.cloudsAt) : ''));
+    if (kp) next.kp = R.parseKp(kp); else errs.push('Kp-Vorhersage nicht erreichbar');
+    if (ov) next.ov = R.reduceOvation(ov);
+    if (mag && mag[0]) next.mag = { bz: +mag[0].bz_gsm, bt: +mag[0].bt, t: Date.parse(mag[0].time_tag) };
+    if (spd && spd[0]) next.speed = { v: +spd[0].proton_speed, t: Date.parse(spd[0].time_tag) };
+    if (k1m) next.kpNow = R.parseKpNow(k1m);
+    if (obs) { next.obs = R.parseFmiObs(obs); next.obsAt = now; }
+    if (o27) { next.out27 = R.parse27(o27); next.out27At = now; }
+    if (d3) next.d3 = R.parse3day(d3);
+    if (det || ens || kp || ov) next.at = now;
+    state.data = next; state.errors = errs; state.loading = false; $('btn-refresh').disabled = false;
+    store.set('data', next);
+    render();
+  }
+  $('btn-refresh').addEventListener('click', () => { load(true); loadGrid(true); });
+
+  /* ---------- Rechnen ---------- */
+  function compute(winOverride) {
+    const d = state.data; if (!d || !d.det || !d.ens) return null;
+    const locs = currentLocs();
+    const idx = locs.map(l => (d.ids || []).indexOf(l.id));
+    if (idx.some(i => i < 0)) return { missing: true };
+    const now = Date.now(), win = winOverride || R.windowFor(state.mode, now);
+    const obs = d.obs && d.obsAt && now - d.obsAt < 75 * 60e3 ? locs.map(l => R.nearestObs(d.obs, l.lat, l.lon, 40)) : null;
+    const results = R.evaluate({
+      locs, det: idx.map(i => d.det[i]), ens: idx.map(i => d.ens[i]), kp: d.kp || [], ov: d.ov,
+      bz: d.mag && now - d.mag.t < 90 * 60e3 ? d.mag.bz : null, kpNow: d.kpNow, obs, now, win
+    });
+    return { results, win, rec: R.recommend(results), now };
+  }
+
+  /* ---------- Zeichnen ---------- */
+  const verbs = { 'zu Fuß': 'zu Fuß', 'Auto': 'mit dem Auto' };
+  const howText = l => l.min === 0 ? 'direkt vor der Tür' : l.min + ' Min. ' + (verbs[l.how] || l.how);
+  const mapsUrl = l => 'https://www.google.com/maps/dir/?api=1&destination=' + l.lat + ',' + l.lon;
+
+  function stripHTML(r) {
+    return '<div class="strip" role="img" aria-label="Stundenverlauf ' + esc(r.loc.name) + '">' + r.rows.map(x => {
+      const light = x.dark === 0, best = r.best && x.t === r.best.t;
+      const pc = x.pc == null ? 0 : x.pc, h = light || x.c == null ? 0 : Math.round(x.c * 100);
+      return '<div class="col' + (light ? ' light' : '') + (best ? ' best' : '') + '"><span class="hh">' + hh(x.t) + '</span>' +
+        '<span class="cell"><i style="background:var(--clear);opacity:' + (0.12 + pc * 0.88).toFixed(2) + '"></i></span>' +
+        '<span class="cell"><i style="background:var(--aurora);opacity:' + (0.12 + x.pa * 0.88).toFixed(2) + '"></i></span>' +
+        '<span class="cbar"><i style="height:' + h + '%"></i></span></div>';
+    }).join('') + '</div><div class="legend"><span style="--c:var(--clear)">klar</span><span style="--c:var(--aurora)">aktiv</span><span style="--c:var(--chance)">Chance je Stunde</span></div>';
+  }
+  const fac = (label, v, color, txt) => '<div class="fac"><span>' + label + '</span><span class="bar"><i style="width:' + Math.round((v || 0) * 100) + '%;background:' + color + '"></i></span><span class="v">' + txt + '</span></div>';
+
+  function renderRec(c) {
+    const el = $('rec');
+    if (!c) {
+      el.innerHTML = '<p class="eyebrow">Empfehlung</p><h2 class="verdict">' + (state.loading ? 'Daten werden geladen' : 'Keine Wolkendaten') + '</h2><p class="sub">' + (state.loading ? 'Wolken, Polarlicht-Aktivität und Dunkelheit für alle Spots.' : 'Prüft die Verbindung und tippt auf „Neu laden“.') + '</p>';
+      return;
+    }
+    if (c.missing) { el.innerHTML = '<p class="eyebrow">Empfehlung</p><h2 class="verdict">Neue Spots, neue Daten</h2><p class="sub">Für diesen Standort fehlen noch Wolkendaten. Tippt auf „Neu laden“.</p>'; return; }
+    const { rec, win, results } = c;
+    let r, title, sub, note = '', eyebrow = 'Empfehlung · ' + win.label;
+    const focus = state.focus && results.find(x => x.loc.id === state.focus);
+    if (focus) {
+      r = focus; eyebrow = 'Ausgewählter Spot · ' + win.label; title = r.loc.name;
+      sub = howText(r.loc) + (r.best ? ' · beste Zeit ' + hh(r.best.t) + ' Uhr' : '');
+    } else if (!rec) {
+      el.innerHTML = '<p class="eyebrow">' + esc(eyebrow) + '</p><h2 class="verdict">Keine Bewertung möglich</h2><p class="sub">Für diesen Zeitraum fehlen Daten.</p>'; return;
+    } else if (rec.verdict === 'hell') {
+      r = rec.home; title = 'Noch zu hell';
+      sub = 'Dunkel genug wird es am Nachmittag gegen halb fünf. Wechselt auf „Heute Nacht“.';
+    } else if (rec.verdict === 'schlecht') {
+      r = rec.best; title = 'Heute eher nicht';
+      sub = 'Die beste Chance liegt bei ' + pct(r.chance) + ' (' + r.loc.name + '). Wecker stellen und schlafen gehen.';
+    } else if (rec.verdict === 'bleiben') {
+      r = rec.home; title = r.loc.min === 0 ? 'Bleibt hier' : 'Bleibt in der Nähe: ' + r.loc.name;
+      sub = howText(r.loc) + (r.best ? ' · beste Zeit ' + hh(r.best.t) + ' Uhr' : '');
+      if (rec.best !== rec.home) note = 'Weiter wegfahren bringt kaum mehr: ' + rec.best.loc.name + ' (' + howText(rec.best.loc) + ') liegt bei ' + pct(rec.best.chance) + '.';
+    } else {
+      r = rec.best; title = 'Fahrt zu: ' + r.loc.name;
+      sub = howText(r.loc) + (r.best ? ' · beste Zeit ' + hh(r.best.t) + ' Uhr' : '');
+      note = 'Lohnt sich: ' + (rec.home.loc.min === 0 ? 'vor der Tür' : rec.home.loc.name) + ' liegt nur bei ' + pct(rec.home.chance) + '.';
+    }
+    const ob = r.rows.find(x => x.obsW > 0);
+    if (ob) { const st = state.data.obs && R.nearestObs(state.data.obs, r.loc.lat, r.loc.lon, 40); if (st) note += (note ? ' ' : '') + 'Wetterstation in ' + Math.round(st.km) + ' km meldet gerade ' + Math.round(st.n) + '/8 Bewölkung.'; }
+    if (r.loc.note) note += (note ? ' ' : '') + r.loc.note;
+    el.style.setProperty('--glow', (0.15 + (r.chance || 0) * 0.7).toFixed(2));
+    el.innerHTML = '<p class="eyebrow">' + esc(eyebrow) + '</p>' +
+      '<div><h2 class="verdict">' + esc(title) + '</h2><p class="sub">' + esc(sub) + '</p></div>' +
+      '<div class="big"><b>' + pct(r.chance) + '</b><span>Chance, Polarlicht zu sehen' + (rec && rec.verdict === 'hell' && !focus ? ' (sobald es dunkel ist)' : '') + '</span></div>' +
+      '<div class="factors">' +
+        fac('Himmel klar', r.pClear, 'var(--clear)', pct(r.pClear)) +
+        fac('Polarlicht aktiv', r.pAur, 'var(--aurora)', pct(r.pAur)) +
+        fac('Spot', r.f, 'var(--muted)', num(r.f, 2)) +
+      '</div>' + stripHTML(r) +
+      (note ? '<p class="note">' + esc(note) + '</p>' : '') +
+      '<div class="actions">' + (r.loc.id !== 'GPS' && r.loc.min > 0 ? '<a class="go" href="' + mapsUrl(r.loc) + '" target="_blank" rel="noopener">Route in Google Maps ↗</a>' : '') +
+      (focus ? '<button type="button" class="linkbtn" id="unfocus">Zurück zur Empfehlung</button>' : '') + '</div>';
+    const u = $('unfocus'); if (u) u.addEventListener('click', () => { state.focus = null; render(); });
+  }
+
+  function renderList(c) {
+    const el = $('list');
+    if (!c || c.missing) { el.innerHTML = ''; return; }
+    const sorted = c.results.slice().sort((a, b) => (b.chance == null ? -1 : b.chance) - (a.chance == null ? -1 : a.chance));
+    el.innerHTML = sorted.map(r => {
+      const l = r.loc;
+      const spark = r.rows.map(x => x.dark === 0 ? '<i class="light" style="height:2px"></i>' : '<i style="height:' + Math.max(2, Math.round((x.c || 0) * 100)) + '%"></i>').join('');
+      return '<li><button type="button" class="spot" data-id="' + esc(l.id) + '" aria-pressed="' + (state.focus === l.id) + '">' +
+        '<span class="nm">' + esc(l.name) + (l.fire ? '<span class="tag">Feuer</span>' : '') + (l.noRec ? '<span class="tag">nur mit Spur</span>' : '') + '</span>' +
+        '<span class="pc">' + pct(r.chance) + '</span>' +
+        '<span class="mt">' + esc(howText(l)) + ' · klar ' + pct(r.pClear) + ' · Nordblick ' + l.n + '/3' + (l.km ? ' · ' + Math.round(l.km) + ' km' : '') + '</span>' +
+        '<span class="spark" aria-hidden="true">' + spark + '</span></button></li>';
+    }).join('');
+  }
+  $('list').addEventListener('click', e => {
+    const b = e.target.closest('.spot'); if (!b) return;
+    state.focus = state.focus === b.dataset.id ? null : b.dataset.id; render();
+    if (state.focus) $('rec').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+  });
+
+  const kpWord = k => k >= 5 ? 'Sturm' : k >= 4 ? 'aktiv' : k >= 2 ? 'leicht aktiv' : 'ruhig';
+  function renderSW(c) {
+    const d = state.data || {}, now = Date.now(), tiles = [];
+    const ref = center();
+    if (d.kpNow && now - d.kpNow.t < 60 * 60e3) tiles.push(['Kp gemessen', num(d.kpNow.kp, 1), kpWord(d.kpNow.kp) + ' · Mittel der letzten 30 Min.']);
+    else tiles.push(['Kp gemessen', '–', 'keine aktuellen Daten']);
+    if (d.kp && d.kp.length) {
+      let kMax = 0, tMax = null; const w = c && c.win ? c.win : R.windowFor('nacht', now);
+      for (let t = Math.max(w.start, now); t <= w.end; t += R.HOUR) { const k = R.kpAt(d.kp, t); if (k > kMax) { kMax = k; tMax = t; } }
+      tiles.push(['Kp-Prognose', num(kMax, 1), (state.mode === 'jetzt' ? 'nächste 3 Std.' : 'heute Nacht') + ', höchster Wert' + (tMax ? ' ab ' + hh(tMax) + ' Uhr' : '')]);
+    } else tiles.push(['Kp-Prognose', '–', 'keine Daten']);
+    if (d.mag && isFinite(d.mag.bz)) {
+      const bz = d.mag.bz, old = now - d.mag.t > 90 * 60e3;
+      const w = bz <= -5 ? 'stark südlich, gut' : bz < 0 ? 'leicht südlich' : 'nördlich, eher ruhig';
+      tiles.push(['Sonnenwind Bz', (bz > 0 ? '+' : '') + num(bz, 0) + ' nT', w + (d.speed ? ' · ' + Math.round(d.speed.v) + ' km/s' : '') + (old ? ' · veraltet' : '')]);
+    } else tiles.push(['Sonnenwind Bz', '–', 'keine Daten']);
+    if (d.ov && d.ov.grid) {
+      const v = R.ovationNear(d.ov, ref.lat, ref.lon), stale = now > d.ov.valid + 30 * 60e3;
+      tiles.push(['OVATION', v + ' %', stale ? 'veraltet, neu laden' : 'Nowcast bis ' + clock(d.ov.valid)]);
+    } else tiles.push(['OVATION', '–', 'keine Daten']);
+    $('sw').innerHTML = tiles.map(([l, b, s]) => '<div class="tile"><span class="l">' + l + '</span><b>' + esc(b) + '</b><small>' + esc(s) + '</small></div>').join('');
+  }
+
+  /* Kp-Verlauf: 1 Tag zurück, 3 Tage voraus */
+  function renderKp() {
+    const d = state.data || {}, el = $('kp-chart');
+    if (!d.kp || !d.kp.length) { el.innerHTML = '<p class="small">Keine Kp-Daten.</p>'; return; }
+    const now = Date.now(), from = now - 24 * 3600e3;
+    const rows = d.kp.filter(r => r.t + 3 * 3600e3 > from);
+    const W = 520, H = 150, L = 22, B = 22, T = 8, n = rows.length, bw = (W - L - 4) / n;
+    const y = k => T + (H - T - B) * (1 - Math.min(9, k) / 9);
+    let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Kp-Index, gemessen und vorhergesagt">';
+    [0, 3, 5, 7, 9].forEach(k => { s += '<line x1="' + L + '" x2="' + W + '" y1="' + y(k) + '" y2="' + y(k) + '" stroke="var(--line)" stroke-width="1"' + (k === 5 ? ' stroke-dasharray="3 3"' : '') + '/><text x="' + (L - 4) + '" y="' + (y(k) + 3) + '" text-anchor="end">' + k + '</text>'; });
+    rows.forEach((r, i) => {
+      const x = L + 2 + i * bw, top = y(r.kp), pred = r.kind === 'predicted', col = r.kp >= 5 ? 'var(--storm)' : 'var(--aurora)';
+      s += '<rect x="' + (x + 0.5).toFixed(1) + '" y="' + top.toFixed(1) + '" width="' + Math.max(1, bw - 1.5).toFixed(1) + '" height="' + (y(0) - top).toFixed(1) + '" rx="1.5" fill="' + col + '" fill-opacity="' + (pred ? 0.35 : 0.95) + '"' + (pred ? ' stroke="' + col + '" stroke-width="1"' : '') + '/>';
+      const l = R.local(r.t); if (l.h < 3) s += '<text x="' + (x + 1) + '" y="' + (H - 6) + '">' + String(l.d).padStart(2, '0') + '.' + String(l.m).padStart(2, '0') + '.</text>';
+    });
+    const xi = rows.findIndex(r => r.t <= now && now < r.t + 3 * 3600e3);
+    if (xi >= 0) { const x = L + 2 + (xi + (now - rows[xi].t) / (3 * 3600e3)) * bw; s += '<line x1="' + x.toFixed(1) + '" x2="' + x.toFixed(1) + '" y1="' + T + '" y2="' + y(0) + '" stroke="var(--ink)" stroke-width="1.5"/><text x="' + (x + 3).toFixed(1) + '" y="' + (T + 9) + '" style="fill:var(--ink)">jetzt</text>'; }
+    s += '</svg>';
+    el.innerHTML = '<div class="legend"><span style="--c:var(--aurora)">gemessen</span><span style="--c:color-mix(in srgb, var(--aurora) 35%, transparent)">vorhergesagt</span><span style="--c:var(--storm)">Sturm ab Kp 5</span></div>' + s +
+      '<p class="small">Kp in 3-Stunden-Blöcken, Datum in finnischer Zeit. In Lappland reicht oft schon Kp 1–2, entscheidend sind die Wolken.</p>';
+    const r3 = $('rationale');
+    if (d.d3 && d.d3.rationale) r3.innerHTML = '<b>Begründung von NOAA</b> ' + esc(d.d3.rationale) + '<small>Originaltext, Stand ' + esc(d.d3.issued) + '. „Coronal hole high speed stream“ = schneller Sonnenwind aus einem koronalen Loch, „CME“ = koronaler Massenauswurf, G1–G5 = Sturmstufen.</small>';
+    else r3.innerHTML = '<span class="small">Keine Begründung von NOAA geladen.</span>';
+  }
+
+  /* 27-Tage-Ausblick mit Reisetagen */
+  function render27() {
+    const d = state.data || {}, el = $('out27');
+    if (!d.out27 || !d.out27.length) { el.innerHTML = '<p class="small">27-Tage-Ausblick nicht geladen.</p>'; return; }
+    const trip = new Set(R.TRIP.map(t => t[0]).concat(['2027-01-10', '2027-01-11']));
+    const rows = d.out27.slice(0, 27), inTrip = rows.filter(r => trip.has(r.date));
+    const bars = rows.map(r => '<i class="' + (r.kp >= 5 ? 'storm' : trip.has(r.date) ? 'trip' : '') + '" style="height:' + Math.max(4, r.kp / 9 * 100) + '%" title="' + r.date + ': Kp bis ' + r.kp + '"></i>').join('');
+    const fmt = s => s.slice(8, 10) + '.' + s.slice(5, 7) + '.';
+    const tripTxt = inTrip.length ? 'Eure Reisetage sind hell markiert: größter Kp ' + inTrip.map(r => fmt(r.date) + ' ' + r.kp).join(', ') + '.' : 'Eure Reisetage tauchen ab etwa dem 7. Dezember in diesem Ausblick auf.';
+    el.innerHTML = '<b style="font-size:0.9rem">27-Tage-Ausblick: größter Kp pro Tag</b><div class="days27" role="img" aria-label="27-Tage-Ausblick">' + bars + '</div>' +
+      '<div class="scale27"><span>' + fmt(rows[0].date) + '</span><span>' + fmt(rows[Math.floor(rows.length / 2)].date) + '</span><span>' + fmt(rows[rows.length - 1].date) + '</span></div>' +
+      '<p class="small">' + esc(tripTxt) + ' Der Ausblick beruht auf der Wiederkehr koronaler Löcher nach einer Sonnendrehung. Er taugt für die Tendenz, nicht für einzelne Nächte.</p>';
+  }
+
+  function renderLinks() {
+    const b = center();
+    const L = [
+      ['Polarlicht-Kameras und Magnetometer', 'Finnischer Wetterdienst: Kamerabilder aus Lappland und Magnetfeld live', 'https://www.ilmatieteenlaitos.fi/revontulet-ja-avaruussaa'],
+      ['Magnetometer-Index (R-Index)', 'FMI: Aktivität je Station mit Schwellen für schwaches und starkes Polarlicht', 'https://space.fmi.fi/MIRACLE/RWC/r-index/en/'],
+      ['Wolken auf der Karte', 'Windy, Wolkenschichten rund um euren Standort', 'https://www.windy.com/?clouds,' + b.lat.toFixed(2) + ',' + b.lon.toFixed(2) + ',8'],
+      ['Polarlicht-Oval', 'NOAA, Vorhersage für die nächsten 30–90 Minuten', 'https://www.swpc.noaa.gov/products/aurora-30-minute-forecast']
+    ];
+    $('links').innerHTML = L.map(([t, s, u]) => '<li><a href="' + u + '" target="_blank" rel="noopener">' + esc(t) + ' ↗<small>' + esc(s) + '</small></a></li>').join('');
+  }
+
+  /* ---------- Karte ---------- */
+  const map = { ready: false };
+  function initMap() {
+    if (!window.L) { $('map').innerHTML = '<p class="small" style="padding:1rem">Die Kartenbibliothek konnte nicht geladen werden.</p>'; return; }
+    const m = L.map('map', { zoomControl: true, attributionControl: true, scrollWheelZoom: false });
+    /* OpenStreetMap, per CSS-Filter nachtdunkel (dunkle Kachel-Dienste verlangen inzwischen einen Schlüssel) */
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 12, className: 'night-tiles', attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>-Mitwirkende' }).addTo(m);
+    map.m = m;
+    map.ir = L.tileLayer.wms('https://view.eumetsat.int/geoserver/ows', { layers: 'mtg_fd:ir105_hrfi', format: 'image/png', transparent: true, version: '1.3.0', opacity: 0.8, attribution: 'EUMETSAT' });
+    map.fog = L.tileLayer.wms('https://view.eumetsat.int/geoserver/ows', { layers: 'mtg_fd:rgb_fog', format: 'image/png', transparent: true, version: '1.3.0', opacity: 0.85, attribution: 'EUMETSAT' });
+    map.spots = L.layerGroup().addTo(m);
+    map.obs = L.layerGroup().addTo(m);
+    map.layer = 'model';
+    map.ready = true;
+    const c = center(); m.setView([c.lat, c.lon], 8);
+  }
+  $('seg-layer').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b || !map.ready) return;
+    map.layer = b.dataset.layer;
+    $('seg-layer').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    [map.ir, map.fog].forEach(l => map.m.removeLayer(l));
+    if (map.overlay) map.m.removeLayer(map.overlay);
+    if (map.layer === 'ir') map.ir.addTo(map.m);
+    else if (map.layer === 'fog') map.fog.addTo(map.m);
+    else drawModel();
+    $('map-slider').hidden = map.layer !== 'model';
+    $('map-note').textContent = map.layer === 'model'
+      ? 'Weiß sind Wolken, dunkel ist klarer Himmel. Kreise sind Spots in der Farbe ihrer Chance, Kästchen sind Wetterstationen mit gemessener Bewölkung in Achteln.'
+      : map.layer === 'ir' ? 'Aktuelles Infrarotbild des Wettersatelliten MTG, alle 10 Minuten neu. Hohe Wolken erscheinen hell. Lappland sieht der Satellit sehr flach von der Seite, und kalter Schnee und tiefe Wolken sehen fast gleich aus.'
+      : 'Nebel- und Tiefwolken-Kombination von MTG für die Nacht. Tiefe Wolken und Nebel erscheinen grünlich bis türkis. Bei 68° N nur grob.';
+  });
+
+  /* Wolkenraster rund um den Standort aus MET Nordic, für die nächsten 12 Stunden */
+  async function loadGrid(force) {
+    if (!map.ready) return;
+    const c = center(), key = c.lat.toFixed(2) + ',' + c.lon.toFixed(2);
+    const g = state.grid;
+    if (!force && g && g.key === key && Date.now() - g.at < 30 * 60e3) { drawModel(); return; }
+    const NY = 11, NX = 11, dLat = 1.3, dLon = 3.2, lats = [], lons = [];
+    for (let i = 0; i < NY; i++) for (let j = 0; j < NX; j++) { lats.push((c.lat - dLat + 2 * dLat * i / (NY - 1)).toFixed(3)); lons.push((c.lon - dLon + 2 * dLon * j / (NX - 1)).toFixed(3)); }
+    try {
+      const j = await getData('https://api.open-meteo.com/v1/forecast?latitude=' + lats.join(',') + '&longitude=' + lons.join(',') + '&hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high&models=metno_seamless&past_hours=1&forecast_hours=13&timezone=GMT', 'json', 30000);
+      const arr = [].concat(j), times = arr[0].hourly.time.map(t => Date.parse(t + 'Z'));
+      const eff = times.map((_, k) => arr.map(p => { const h = p.hourly; return R.effCloud(h.cloud_cover_low[k], h.cloud_cover_mid[k], h.cloud_cover_high[k]); }));
+      state.grid = { key, at: Date.now(), NY, NX, latMin: c.lat - dLat, latMax: c.lat + dLat, lonMin: c.lon - dLon, lonMax: c.lon + dLon, times, eff };
+      const h0 = Math.floor(Date.now() / R.HOUR) * R.HOUR, start = Math.max(0, times.findIndex(t => t >= h0));
+      $('map-hour').min = start; $('map-hour').max = times.length - 1; $('map-hour').value = start;
+      map.m.fitBounds([[c.lat - dLat * 0.75, c.lon - dLon * 0.75], [c.lat + dLat * 0.75, c.lon + dLon * 0.75]]);
+      drawModel();
+    } catch (e) { $('map-hour-l').textContent = 'keine Daten'; }
+  }
+  function drawModel() {
+    const g = state.grid; if (!g || !map.ready) return;
+    const k = +$('map-hour').value;
+    $('map-hour-l').textContent = hh(g.times[k]) + ' Uhr';
+    if (map.overlay) map.m.removeLayer(map.overlay);
+    if (map.layer !== 'model') return;
+    const W = 220, H = 220, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const ctx = cv.getContext('2d'), img = ctx.createImageData(W, H), f = g.eff[k];
+    const red = document.documentElement.classList.contains('red'), col = red ? [255, 70, 58] : [226, 234, 246];
+    const merc = la => Math.log(Math.tan(Math.PI / 4 + la * Math.PI / 360));
+    const yTop = merc(g.latMax), yBot = merc(g.latMin);
+    for (let py = 0; py < H; py++) {
+      const lat = Math.atan(Math.sinh(yTop - (py + 0.5) / H * (yTop - yBot))) * 180 / Math.PI;
+      const fi = (lat - g.latMin) / (g.latMax - g.latMin) * (g.NY - 1);
+      for (let px = 0; px < W; px++) {
+        const fj = (px + 0.5) / W * (g.NX - 1);
+        const i0 = Math.min(g.NY - 2, Math.max(0, Math.floor(fi))), j0 = Math.min(g.NX - 2, Math.floor(fj)), di = fi - i0, dj = fj - j0;
+        const v = (a, b) => f[a * g.NX + b] == null ? 0 : f[a * g.NX + b];
+        const e = v(i0, j0) * (1 - di) * (1 - dj) + v(i0, j0 + 1) * (1 - di) * dj + v(i0 + 1, j0) * di * (1 - dj) + v(i0 + 1, j0 + 1) * di * dj;
+        const a = Math.max(0, Math.min(1, (e - 10) / 80)) * 0.82, o = (py * W + px) * 4;
+        img.data[o] = col[0]; img.data[o + 1] = col[1]; img.data[o + 2] = col[2]; img.data[o + 3] = Math.round(a * 255);
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    map.overlay = L.imageOverlay(cv.toDataURL(), [[g.latMin, g.lonMin], [g.latMax, g.lonMax]], { opacity: 1, interactive: false }).addTo(map.m);
+    map.overlay.bringToBack();
+    map.m.eachLayer(l => { if (l instanceof L.TileLayer && !(l instanceof L.TileLayer.WMS)) l.bringToBack(); });
+  }
+  $('map-hour').addEventListener('input', drawModel);
+  function drawMarkers(c) {
+    if (!map.ready) return;
+    map.spots.clearLayers(); map.obs.clearLayers();
+    const d = state.data || {};
+    (d.obs || []).forEach(s => L.marker([s.lat, s.lon], { icon: L.divIcon({ className: '', html: '<div class="obs-mk">' + Math.round(s.n) + '/8</div>', iconSize: [30, 14], iconAnchor: [15, 7] }), interactive: false }).addTo(map.obs));
+    if (c && c.results) c.results.forEach(r => {
+      const v = r.chance || 0, col = v >= 0.5 ? '#C6F26E' : v >= 0.25 ? '#5BE0A8' : '#8E9BB3';
+      L.circleMarker([r.loc.lat, r.loc.lon], { radius: 6 + v * 6, color: '#05070D', weight: 1.5, fillColor: col, fillOpacity: 0.95 }).addTo(map.spots)
+        .bindTooltip(r.loc.name + ' · ' + pct(r.chance), { className: 'mk-tip', direction: 'top', offset: [0, -6] })
+        .on('click', () => { state.focus = r.loc.id; render(); $('rec').scrollIntoView({ block: 'start' }); });
+    });
+  }
+
+  /* ---------- Wecker (Nachtwache) ---------- */
+  const watch = { on: false, timer: null, lock: null, audio: null, ringing: false, snoozeUntil: 0, lastAlarm: 0, lastChance: 0 };
+  async function keepAwake() { try { if ('wakeLock' in navigator && !document.hidden) watch.lock = await navigator.wakeLock.request('screen'); } catch (e) { /* ohne Wake Lock: Bildschirm-Timeout am Handy verlängern */ } }
+  function beep() {
+    const a = watch.audio; if (!a) return;
+    const t0 = a.currentTime;
+    [0, 0.25, 0.5].forEach((dt, i) => { const o = a.createOscillator(), g = a.createGain(); o.type = 'sine'; o.frequency.value = i === 2 ? 1175 : 880; g.gain.setValueAtTime(0.0001, t0 + dt); g.gain.exponentialRampToValueAtTime(0.6, t0 + dt + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dt + 0.2); o.connect(g).connect(a.destination); o.start(t0 + dt); o.stop(t0 + dt + 0.22); });
+  }
+  function showOv(title, msg, ringing) {
+    const ov = $('ov'); ov.hidden = false; ov.classList.toggle('ring', !!ringing);
+    $('ov-t').textContent = title; $('ov-m').textContent = msg; $('ov-snooze').hidden = !ringing;
+    $('ov-stop').textContent = ringing ? 'Aus' : 'Wache beenden';
+  }
+  async function notify(title, body) {
+    try {
+      if (!('Notification' in window) || Notification.permission !== 'granted') return;
+      const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration();
+      if (reg) reg.showNotification(title, { body, tag: 'polarlicht', renotify: true, requireInteraction: true, icon: 'icon-512.png' });
+      else new Notification(title, { body });
+    } catch (e) { /* Hinweis ist nur ein Zusatz */ }
+  }
+  function ring(title, msg) {
+    watch.ringing = true; watch.lastAlarm = Date.now();
+    showOv(title, msg, true); notify(title, msg);
+    const loop = () => { if (!watch.ringing) return; beep(); if (navigator.vibrate) navigator.vibrate([400, 150, 400, 150, 700]); setTimeout(loop, 1600); };
+    loop();
+  }
+  async function watchCheck() {
+    if (!watch.on || watch.ringing) return;
+    await load(true);
+    const h0 = Math.floor(Date.now() / R.HOUR) * R.HOUR;
+    const c = compute({ start: h0, end: h0 + R.HOUR, label: 'jetzt' });
+    const th = parseFloat($('w-th').value);
+    if (!c || c.missing || !c.rec) { showOv('Wache läuft', 'Letzte Prüfung ' + clock(Date.now()) + ': keine Daten. Neuer Versuch in 10 Minuten.'); return; }
+    const r = c.rec.verdict === 'fahren' ? c.rec.best : c.rec.home;
+    const v = r.chance || 0, dark = c.rec.verdict !== 'hell';
+    const cooled = Date.now() > watch.snoozeUntil && (Date.now() - watch.lastAlarm > 60 * 60e3 || v >= watch.lastChance + 0.15);
+    if (dark && v >= th && cooled) {
+      watch.lastChance = v;
+      ring('Jetzt raus!', pct(v) + ' Chance bei ' + r.loc.name + ' (' + howText(r.loc) + '). Himmel klar ' + pct(r.pClear) + ', Polarlicht aktiv ' + pct(r.pAur) + '.');
+    } else {
+      showOv('Wache läuft', 'Letzte Prüfung ' + clock(Date.now()) + ': ' + pct(v) + ' bei ' + r.loc.name + ', Schwelle ' + pct(th) + '. Nächste Prüfung in 10 Minuten.');
+    }
+  }
+  async function startWatch() {
+    watch.on = true;
+    try { watch.audio = watch.audio || new (window.AudioContext || window.webkitAudioContext)(); await watch.audio.resume(); } catch (e) { watch.audio = null; }
+    try { if ('Notification' in window && Notification.permission === 'default') await Notification.requestPermission(); } catch (e) { /* ohne Benachrichtigung */ }
+    await keepAwake();
+    showOv('Wache läuft', 'Erste Prüfung läuft …');
+    watchCheck();
+    watch.timer = setInterval(watchCheck, 10 * 60e3);
+  }
+  function stopWatch() {
+    watch.on = false; watch.ringing = false; clearInterval(watch.timer);
+    try { watch.lock && watch.lock.release(); } catch (e) { /* schon frei */ }
+    $('ov').hidden = true;
+  }
+  $('w-start').addEventListener('click', startWatch);
+  $('w-test').addEventListener('click', async () => {
+    try { watch.audio = watch.audio || new (window.AudioContext || window.webkitAudioContext)(); await watch.audio.resume(); } catch (e) { watch.audio = null; }
+    watch.on = watch.on || false; ring('Probealarm', 'So klingt und vibriert der Wecker. Tippt auf „Aus“.');
+  });
+  $('ov-stop').addEventListener('click', () => { if (watch.ringing && watch.on) { watch.ringing = false; showOv('Wache läuft', 'Alarm aus. Die Wache prüft weiter alle 10 Minuten.'); } else stopWatch(); });
+  $('ov-snooze').addEventListener('click', () => { watch.ringing = false; watch.snoozeUntil = Date.now() + 30 * 60e3; if (watch.on) showOv('Wache läuft', 'Schlummern bis ' + clock(watch.snoozeUntil) + '.'); else $('ov').hidden = true; });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && watch.on) keepAwake(); });
+  $('w-th').value = String(store.get('th') || '0.55');
+  $('w-th').addEventListener('change', () => store.set('th', $('w-th').value));
+
+  /* ---------- Gesamtablauf ---------- */
+  function render() {
+    renderSeg();
+    const c = compute();
+    renderRec(c); renderList(c); renderSW(c); renderLinks(); renderKp(); render27(); drawMarkers(c);
+    const d = state.data;
+    if (state.loading) return;
+    if (state.errors.length) setStamp(state.errors.join(' · '), true);
+    else if (d && d.at) setStamp('Stand ' + clock(d.at) + (Date.now() - d.at > 60 * 60e3 ? ' · älter als 1 Stunde, neu laden' : ''), Date.now() - d.at > 60 * 60e3);
+  }
+
+  setRed(!!store.get('red'));
+  initMap();
+  renderSeg(); render(); load(false); loadGrid();
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => { /* ohne Offline-Modus */ });
+  setInterval(() => { if (!document.hidden && !watch.on) load(false); }, 15 * 60e3);
+  setInterval(() => { if (!document.hidden && !state.loading) render(); }, 60e3);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && !watch.on) load(false); });
+})();
+</script>
+</body>
+</html>
