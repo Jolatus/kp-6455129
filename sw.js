@@ -1,7 +1,7 @@
 /* Polarlicht-Radar: hält die App offline bereit und zeigt Benachrichtigungen des Weckers.
    Wetterdaten werden nicht hier zwischengespeichert, das macht die App selbst. */
-const CACHE = 'polarlicht-radar-v3';
-const SHELL = ['./', './index.html', './radar-core.js', './manifest.webmanifest', './icon-512.png'];
+const CACHE = 'polarlicht-radar-v4';
+const SHELL = ['./', './index.html', './radar-core.js?v=4', './manifest.webmanifest', './icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
