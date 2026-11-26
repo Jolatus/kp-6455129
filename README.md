@@ -1,17 +1,17 @@
 # Polarlicht-Radar
 
-Eine Web-App für die Lappland-Reise: Sie sagt euch, wo ihr heute Nacht die beste Chance auf Polarlicht habt, ob sich das Fahren lohnt, und weckt euch, wenn es losgeht.
+Eine Web-App für die Lappland-Reise: Sie sagt euch, ob sich heute Nacht das Rausgehen lohnt, wann und wo, ob sich eine längere Fahrt zu klarerem Himmel lohnt, und weckt euch, wenn es losgeht. Tagsüber zeigt sie den Ausblick auf die Nacht, abends die Lage jetzt.
 
 | Datei | Wozu |
 |---|---|
-| `index.html` | Die App: Ampel-Empfehlung mit Temperatur und Mond, nächste Nächte, Rückblick auf die letzten Nächte (gemessen), Wolken- und Temperaturkarte, Spots, Kamera-Tipps für Pixel 9 Pro und Pixel 8a, Wecker, Sonnensturm-Ausblick |
-| `radar-core.js` | Der Rechenkern, den App und Push-Wecker gemeinsam nutzen (auch Mond und Rückblick) |
+| `index.html` | Die App: Ampel-Empfehlung mit „Gerade jetzt“, Temperatur und Mond, nächste Nächte, Spots in der Nähe und Fernziele bis ca. 1,5 Std., Wolken- und Temperaturkarte, Wecker, Kamera-Tipps für Pixel 9 Pro und Pixel 8a, Rückblick auf die letzten Nächte (gemessen), Sonnensturm-Ausblick |
+| `radar-core.js` | Der Rechenkern, den App und Push-Wecker gemeinsam nutzen (auch Tageszeit, Mond, Fernziele und Rückblick) |
 | `sw.js`, `manifest.webmanifest`, `icon-512.png` | Offline-Modus, Benachrichtigungen, Symbol auf dem Home-Bildschirm |
 | `karte-offline.bin`, `karte-offline.json` | Kartenpaket (304 OpenStreetMap-Kacheln, Zoom 7–11 rund um die Unterkünfte). Die App legt es per Knopf „Karte für Funklöcher speichern“ in den Offline-Speicher. © OpenStreetMap-Mitwirkende, ODbL |
-| `push/check.mjs` | Push-Wecker: prüft die Lage und schickt eine Nachricht über ntfy |
+| `push/check.mjs` | Push-Wecker: Abend-Briefing gegen 17 Uhr und Alarm, wenn es losgeht, beides über ntfy mit Knopf „Route“ |
 | `.github/workflows/polarlicht-wecker.yml` | Startet den Push-Wecker abends alle 10 Minuten auf GitHub |
 
-Alle Datenquellen sind kostenlos und brauchen keinen Schlüssel: Open-Meteo (MET Norway, ECMWF, DWD), Finnischer Wetterdienst (FMI), NOAA SWPC, EUMETSAT, OpenStreetMap.
+Alle Datenquellen sind kostenlos und brauchen keinen Schlüssel: Open-Meteo (MET Norway, ECMWF, DWD), Finnischer Wetterdienst (FMI), NOAA SWPC, EUMETSAT, OpenStreetMap. Die Fahrzeiten zu den Fernzielen stammen einmalig aus dem OSRM-Routing auf OpenStreetMap-Daten, plus 10 % für Winterstraßen.
 
 ## 1. Online stellen (GitHub Pages, kostenlos)
 
@@ -34,18 +34,22 @@ Der Wecker in der App klingelt nur, wenn sie offen ist und das Handy am Ladekabe
    - **Secret** `NTFY_TOPIC`: der Themenname aus Schritt 2.
    - **Variable** `SITE_URL`: die Adresse der App aus Teil 1.
    - **Variable** `THRESHOLD` (optional): ab welcher Chance geweckt wird, Standard `0.55`.
-   - **Variable** `BASE` (nur zum Testen vor der Reise): `see`, `farm`, `sinetta` oder `koengas`. Vom 03. bis 09.01. wählt der Wecker die Unterkunft selbst nach Datum.
-4. Reiter **Actions** öffnen und Workflows erlauben, falls GitHub danach fragt. Dann **Polarlicht-Wecker → Run workflow** mit `test_push = 1`. Nach kurzer Zeit kommt eine Testnachricht.
-5. Fertig. Abends von 16 bis 5 Uhr finnischer Zeit prüft der Wecker alle 10 Minuten. Er weckt höchstens alle 90 Minuten einmal.
+   - **Variable** `BASE` (nur zum Testen vor der Reise): `see`, `farm`, `sinetta` oder `rovaniemi`. Vom 03. bis 10.01. wählt der Wecker die Unterkunft selbst nach Datum.
+   - **Variable** `BRIEFING` (optional): `0` schaltet das Abend-Briefing ab.
+4. Reiter **Actions** öffnen und Workflows erlauben, falls GitHub danach fragt. Dann **Polarlicht-Wecker → Run workflow** mit `test_push = 1`. Nach kurzer Zeit kommt eine Testnachricht. Mit `test_briefing = 1` und `dry_run = 0` kommt sofort ein Abend-Briefing.
+5. Fertig. Abends von 16 bis 5 Uhr finnischer Zeit prüft der Wecker alle 10 Minuten. Er weckt höchstens alle 90 Minuten einmal, außer die Magnetometer melden danach starkes Polarlicht. Gegen 17 Uhr kommt einmal am Tag ein leiser Ausblick auf die Nacht.
 6. Nach der Reise: **Actions → Polarlicht-Wecker → ··· → Disable workflow**.
 
-**Wann weckt er?** Wenn es dunkel ist und entweder die berechnete Chance für die laufende und die nächste Stunde über der Schwelle liegt, oder wenn die finnischen Magnetometer in eurer Nähe Aktivität melden und der Himmel zu mindestens 50 % klar ist.
+**Wann weckt er?** Wenn es dunkel ist und entweder die berechnete Chance für die laufende und die nächste Stunde über der Schwelle liegt, oder wenn die finnischen Magnetometer in eurer Nähe Aktivität melden und der Himmel zu mindestens 50 % klar ist. Er schaut dabei nur auf die Spots in der Nähe.
+
+**Was steht im Abend-Briefing?** Chance für heute Nacht, Ziel und Weg (auch ein Fernziel, wenn es rund um die Unterkunft zu ist), beste Zeit, Himmel, gefühlte Tiefsttemperatur, Mond, und ob die nächste Nacht deutlich besser wird. Mit Knopf „Route“ zu Google Maps. Es klingelt nicht laut.
 
 ## Gut zu wissen
 
 - GitHub startet geplante Läufe manchmal 5–15 Minuten später. Für Polarlicht reicht das meist.
 - Geplante Läufe schaltet GitHub ab, wenn ein Repository 60 Tage lang unverändert bleibt. Eingerichtet Ende November reicht das bis nach der Reise.
 - Vor der Reise läuft der Wecker zwar jeden Abend an, beendet sich aber sofort, solange keine Variable `BASE` gesetzt ist.
+- Am 10.01. (Rovaniemi) endet alles mit der Abfahrt um 21 Uhr.
 - In einem öffentlichen Repository kann jeder `radar-core.js` lesen, also auch die Lage der Spots und die Reisedaten. Die Unterkünfte sind dort nur neutral benannt. Das ntfy-Thema bleibt als Secret geheim. Wer den Themennamen kennt, kann die Nachrichten mitlesen, also nicht weitergeben.
 - GitHub Actions sind für öffentliche Repositories kostenlos.
 

@@ -6,15 +6,18 @@
   const HOUR = 3600e3;
 
   /* ---------- Orte ---------- */
+  /* until: Stunde (Ortszeit), bis zu der man dort ist (Rovaniemi: Abfahrt um 21 Uhr) */
   const BASES = {
     sinetta: { name: 'Sinettä', short: 'Sinettä', lat: 66.6363, lon: 25.3006 },
     see: { name: 'Hütte am See', short: 'See', lat: 68.5100, lon: 23.3205 },
     farm: { name: 'Rentierfarm', short: 'Farm', lat: 67.77397, lon: 25.23808 },
-    koengas: { name: 'Hütte in Köngäs', short: 'Köngäs', lat: 67.9183, lon: 24.8346 }
+    rovaniemi: { name: 'Rovaniemi', short: 'Rovaniemi', lat: 66.5025, lon: 25.7305, until: 21 }
   };
 
   /* n = freier Blick nach Norden (1–3), d = Dunkelheit (1–3), wie auf der Reiseseite bewertet.
-     base: { basis: [Minuten, Art] }. Ausweichpunkte liegen an der Hauptstraße, dort nur in Parkbuchten halten. */
+     base: { basis: [Minuten, Art] }. Ausweichpunkte liegen an der Hauptstraße, dort nur in Parkbuchten halten.
+     far: Fernziel für den Wolkenloch-Finder (bis ca. 1,5 Std. Fahrt). Fahrzeiten aus OSRM plus 10 % Winterzuschlag. */
+  const FAR_NOTE = 'Fernziel: am Ortsrand eine Parkbucht mit freiem Blick nach Norden suchen, nie am Straßenrand halten. Vor der Fahrt tanken.';
   const SPOTS = [
     { id: 'SH', name: 'Hof der Unterkunft', lat: 66.6363, lon: 25.3006, n: 1, d: 1, base: { sinetta: [0, 'vor der Tür'] } },
     { id: 'S1', name: 'Lehtojärvi-Vogelturm', lat: 66.63703, lon: 25.31202, n: 2, d: 1, lake: true, base: { sinetta: [1, 'Auto'] }, note: 'Treppe kann vereist sein.' },
@@ -33,17 +36,25 @@
     { id: 'F3', name: 'Rastinjärvi', lat: 67.79139, lon: 25.26156, n: 3, d: 3, lake: true, base: { farm: [3, 'Auto'] } },
     { id: 'F4', name: 'Laavu an der Vesmantie', lat: 67.8146, lon: 25.30573, n: 1, d: 3, fire: true, base: { farm: [7, 'Auto'] } },
     { id: 'FS', name: 'Straße 79 südlich von Kittilä', lat: 67.5551, lon: 24.9222, n: 2, d: 3, base: { farm: [50, 'Auto'] }, note: 'Ausweichpunkt, nur in einer Parkbucht halten.' },
-    { id: 'L7', name: 'Levi-Gipfel', lat: 67.812, lon: 24.825, n: 2, d: 1, base: { farm: [55, 'Auto'], koengas: [19, 'Auto'] } },
-    { id: 'K8', name: 'Kätkä-Laavu Korkeaniemi', lat: 67.7835, lon: 24.7255, n: 2, d: 2, fire: true, base: { farm: [70, 'Auto + Fußweg'], koengas: [35, 'Auto + Fußweg'] } },
+    { id: 'L7', name: 'Levi-Gipfel', lat: 67.812, lon: 24.825, n: 2, d: 1, base: { farm: [55, 'Auto'] } },
+    { id: 'K8', name: 'Kätkä-Laavu Korkeaniemi', lat: 67.7835, lon: 24.7255, n: 2, d: 2, fire: true, base: { farm: [70, 'Auto + Fußweg'] } },
 
-    { id: 'K1', name: 'Lichtung an der Hütte', lat: 67.91833, lon: 24.8346, n: 1, d: 2, base: { koengas: [0, 'vor der Tür'] } },
-    { id: 'K2', name: 'Akanrimpi-Vogelturm', lat: 67.85482, lon: 24.84855, n: 3, d: 2, base: { koengas: [10, 'Auto'] } }
+    /* Rovaniemi am 10.01.: ohne Auto, also zu Fuß oder mit dem Taxi */
+    { id: 'R1', name: 'Ufer an der Jätkänkynttilä-Brücke', lat: 66.5031, lon: 25.7412, n: 2, d: 1, base: { rovaniemi: [10, 'zu Fuß'] }, note: 'Stadtlicht: lohnt nur bei kräftigem Polarlicht. Vom Ufer nach Norden über den Fluss schauen.' },
+    { id: 'R2', name: 'Ounasvaara', lat: 66.5025, lon: 25.8021, n: 3, d: 2, base: { rovaniemi: [12, 'Taxi'] }, note: 'Hügel östlich der Stadt, dunkler als am Fluss. Taxi für den Rückweg rechtzeitig vor der Abfahrt bestellen.' },
+
+    /* Fernziele für den Wolkenloch-Finder */
+    { id: 'XKA', name: 'Kaaresuvanto', lat: 68.4500, lon: 22.4853, n: 2, d: 2, far: true, base: { see: [85, 'Auto'] }, note: FAR_NOTE },
+    { id: 'XMU', name: 'Muonio', lat: 67.9593, lon: 23.6774, n: 2, d: 2, far: true, base: { see: [90, 'Auto'] }, note: FAR_NOTE },
+    { id: 'XPO', name: 'Pokka', lat: 68.1585, lon: 25.7659, n: 2, d: 3, far: true, base: { farm: [60, 'Auto'] }, note: FAR_NOTE },
+    { id: 'XAK', name: 'Äkäslompolo (Ylläs)', lat: 67.6029, lon: 24.1516, n: 2, d: 2, far: true, base: { farm: [95, 'Auto'] }, note: FAR_NOTE },
+    { id: 'XVI', name: 'Vikajärvi, Straße 4', lat: 66.6240, lon: 26.1996, n: 2, d: 2, far: true, base: { sinetta: [55, 'Auto'] }, note: FAR_NOTE }
   ];
 
   /* Welche Basis an welchem Abend (Ortszeit) */
   const TRIP = [
     ['2027-01-03', 'sinetta'], ['2027-01-04', 'see'], ['2027-01-05', 'see'], ['2027-01-06', 'see'],
-    ['2027-01-07', 'farm'], ['2027-01-08', 'farm'], ['2027-01-09', 'farm']
+    ['2027-01-07', 'farm'], ['2027-01-08', 'farm'], ['2027-01-09', 'farm'], ['2027-01-10', 'rovaniemi']
   ];
 
   /* ---------- Zeit in Finnland ---------- */
@@ -75,7 +86,15 @@
     const end = start + 10 * HOUR; /* 16 bis 02 Uhr */
     const ld = local(start + HOUR);
     const label = k === 0 ? 'Heute Nacht' : k === 1 ? 'Morgen Nacht' : k === -1 ? 'Letzte Nacht' : WD[new Date(Date.UTC(ld.y, ld.m - 1, ld.d)).getUTCDay()] + ' ' + String(ld.d).padStart(2, '0') + '.' + String(ld.m).padStart(2, '0') + '. Nacht';
-    return { start: k === 0 ? Math.max(start, h0) : start, end, label, k };
+    return { start: k === 0 ? Math.max(start, h0) : start, end, label, k, from: start };
+  }
+  /* Fenster kürzen, wenn man an der Basis nur bis zu einer bestimmten Stunde ist (Rovaniemi: Abfahrt um 21 Uhr) */
+  function clampWindow(win, base) {
+    const b = BASES[base];
+    if (!win || !b || b.until == null) return win;
+    const l = local(win.from != null ? win.from : win.start);
+    const lim = localTime(l.y, l.m, l.d, b.until) - HOUR; /* letzte volle Stunde vor der Abfahrt */
+    return Object.assign({}, win, { end: Math.min(win.end, lim), until: b.until });
   }
 
   /* ---------- Sonnenhöhe (NOAA-Verfahren) ---------- */
@@ -98,6 +117,16 @@
   }
   /* 1 = dunkel genug, 0,5 = späte Dämmerung, 0 = zu hell */
   const darkness = alt => alt < -10 ? 1 : alt < -6 ? 0.5 : 0;
+  /* Tag oder Nacht am Ort? Tag = noch hell und mehr als 1 Stunde bis zur Dunkelheit (Sonne unter −6°).
+     darkFrom/darkTo: Beginn und Ende der nächsten Dunkelheit (auf 10 Minuten genau, innerhalb von 24 Stunden) */
+  function dayState(now, lat, lon) {
+    const step = 10 * 60e3, isDark = t => sunAlt(t, lat, lon) < -6;
+    let darkFrom = null, darkTo = null;
+    for (let t = now; t < now + 24 * HOUR; t += step) if (isDark(t)) { darkFrom = t; break; }
+    if (darkFrom != null) for (let t = darkFrom; t < darkFrom + 24 * HOUR; t += step) if (!isDark(t)) { darkTo = t; break; }
+    const darkNow = darkFrom === now;
+    return { day: !darkNow && (darkFrom == null || darkFrom - now > HOUR), darkNow, darkFrom, darkTo };
+  }
 
   /* ---------- Mond: Höhe und beleuchteter Anteil (vereinfachte Bahnformeln, auf etwa 1° genau) ---------- */
   const OBL = rad(23.4397);
@@ -129,6 +158,13 @@
   function kpToP(kp, lat) {
     const k50 = 0.6 + (69 - lat) * 0.75;
     return 0.95 / (1 + Math.exp(-(kp - k50) / 0.8)); /* nie ganz sicher */
+  }
+  /* Tageszeit: In Finnisch-Lappland ist Polarlicht um die magnetische Mitternacht (etwa 23:30 Uhr Ortszeit) am häufigsten,
+     am frühen Abend und am Morgen seltener. Kp ist ein weltweiter Index ohne Tageszeit, deshalb dieser Faktor (0,65 bis 1). */
+  function nightFactor(ms) {
+    const l = local(ms);
+    let dh = Math.abs(l.h + l.min / 60 - 23.5); if (dh > 12) dh = 24 - dh;
+    return 0.65 + 0.35 * Math.exp(-((dh / 3.2) ** 2));
   }
   function parseKp(rows) {
     const out = [];
@@ -193,7 +229,7 @@
         if (o.kpNow && now - o.kpNow.t < 30 * 60e3 && lead >= 0 && lead <= 2) { const w = [0.9, 0.7, 0.3][lead]; k = w * o.kpNow.kp + (1 - w) * k; }
         if (t < now + 2 * HOUR) k += bzBoost(bz);
         kpMax = Math.max(kpMax, k);
-        let pa = kpToP(k, loc.lat);
+        let pa = kpToP(k, loc.lat) * nightFactor(t + 30 * 60e3);
         let ovv = null;
         if (ov && isFinite(ov.valid) && t <= ov.valid + 30 * 60e3) { ovv = ovationNear(ov, loc.lat, loc.lon); pa = Math.max(pa, ovationFloor(ovv)); }
         /* Lokale Magnetometer (FMI-R-Index) sind die beste Aussage über „jetzt“ */
@@ -251,19 +287,38 @@
     });
   }
 
-  /* Empfehlung: lohnt sich die Fahrt gegenüber dem Platz vor der Tür? */
-  function recommend(results) {
-    const ok = results.filter(r => r.chance != null && !r.loc.noRec);
+  /* Empfehlung: lohnt sich der Weg gegenüber dem Platz vor der Tür?
+     Ein anderer Spot muss um 3 Punkte plus 1,2 Punkte je 10 Minuten zusätzlichem Weg besser sein.
+     Fernziele (far) kommen nur in Frage, wenn sie auch die beste Wahl in der Nähe so deutlich schlagen.
+     opts.near: Fernziele ganz weglassen (Wecker: für eine lange Fahrt ist es dann zu spät).
+     Rückgabe: target = Ziel, home = vor der Tür, best = Ziel bei „fahren“, sonst die stärkste Alternative. */
+  const gainNeeded = (a, ref) => 0.03 + 0.0012 * Math.max(0, (a.loc.min || 0) - (ref.loc.min || 0));
+  function recommend(results, opts) {
+    opts = opts || {};
+    const pool = results.filter(r => !r.loc.noRec && !(opts.near && r.loc.far));
+    if (!pool.length) return null;
+    const near = pool.filter(r => !r.loc.far);
+    const home = (near.length ? near : pool).reduce((a, b) => ((a.loc.min || 0) <= (b.loc.min || 0) ? a : b));
+    if (!results.some(r => r.dark)) return { target: home, best: home, home, near: home, verdict: 'hell', far: false };
+    const ok = pool.filter(r => r.chance != null);
     if (!ok.length) return null;
-    const home = ok.reduce((a, b) => ((a.loc.min || 0) <= (b.loc.min || 0) ? a : b));
-    const score = r => r.chance - (r.loc.min || 0) * 0.0012;
-    const best = ok.reduce((a, b) => (score(b) > score(a) ? b : a));
+    const ch = r => (r.chance == null ? 0 : r.chance);
+    const score = r => ch(r) - (r.loc.min || 0) * 0.0012;
+    const argmax = (list, f) => list.reduce((a, b) => (a == null || f(b) > f(a) ? b : a), null);
+    /* beste Wahl in der Nähe */
+    const nearOk = ok.filter(r => !r.loc.far);
+    let target = home;
+    const bestNear = argmax(nearOk, score);
+    if (bestNear && bestNear !== home && ch(bestNear) - ch(home) >= gainNeeded(bestNear, home)) target = bestNear;
+    const nearTarget = target;
+    /* Wolkenloch-Finder: deutlich besser weiter weg? */
+    const bestFar = argmax(ok.filter(r => r.loc.far), score);
+    if (bestFar && ch(bestFar) - ch(nearTarget) >= gainNeeded(bestFar, nearTarget)) target = bestFar;
     let verdict;
-    if (!ok.some(r => r.dark)) verdict = 'hell';
-    else if (best.chance < 0.08) verdict = 'schlecht';
-    else if (best === home || best.chance - home.chance < 0.08) verdict = 'bleiben';
-    else verdict = 'fahren';
-    return { best, home, verdict };
+    if (ch(target) < 0.08) { verdict = 'schlecht'; target = home; }
+    else verdict = target === home ? 'bleiben' : 'fahren';
+    const alt = argmax(ok.filter(r => r !== home), score);
+    return { target, home, near: nearTarget, best: verdict === 'fahren' ? target : alt || home, verdict, far: verdict === 'fahren' && !!target.loc.far };
   }
 
   const haversineKm = (a, b) => {
@@ -273,6 +328,19 @@
   };
 
   /* ---------- Klartext ---------- */
+  /* Weg zum Spot in Worten */
+  const VERBS = { 'zu Fuß': 'zu Fuß', 'Auto': 'mit dem Auto', 'Taxi': 'mit dem Taxi' };
+  const howText = l => !l.min ? 'direkt vor der Tür' : (l.min >= 60 ? Math.floor(l.min / 60) + ' Std. ' + (l.min % 60 ? (l.min % 60) + ' Min.' : '') : l.min + ' Min.').trim() + ' ' + (VERBS[l.how] || l.how || '');
+  const mapsUrl = l => 'https://www.google.com/maps/dir/?api=1&destination=' + l.lat + ',' + l.lon;
+  /* Zusammenhängendes gutes Zeitfenster um die beste Stunde (mindestens 80 % der besten Chance) */
+  function goodSpan(r) {
+    if (!r || !r.best) return null;
+    const i = r.rows.indexOf(r.best), lim = r.best.c * 0.8;
+    let a = i, b = i;
+    while (a > 0 && r.rows[a - 1].c != null && r.rows[a - 1].c >= lim) a--;
+    while (b < r.rows.length - 1 && r.rows[b + 1].c != null && r.rows[b + 1].c >= lim) b++;
+    return { from: r.rows[a].t, to: r.rows[b].t + HOUR };
+  }
   /* Ampel für die Chance */
   function level(ch) {
     if (ch == null) return { key: 'none', word: 'Keine Daten', short: '–' };
@@ -349,7 +417,7 @@
     const rows = [];
     for (let t = win.start; t < win.end; t += HOUR) {
       const mid = t + 30 * 60e3, dark = darkness(sunAlt(mid, lat, lon));
-      const n = at('n_man', t), temp = at('t2m', t), k = kp && kp.length ? kpAt(kp, mid) : null, pa = k == null ? 0 : kpToP(k, lat);
+      const n = at('n_man', t), temp = at('t2m', t), k = kp && kp.length ? kpAt(kp, mid) : null, pa = k == null ? 0 : kpToP(k, lat) * nightFactor(mid);
       const clear = n == null ? null : obsClear(n), moon = moonState(mid, lat, lon), mf = moonFactor(moon.light, pa);
       rows.push({ t, n, temp, kp: k, pa, dark, clear, moon, c: clear == null || k == null ? null : clear * pa * dark * mf });
     }
@@ -392,5 +460,5 @@
     return { rationale: r ? r[1].replace(/\s+/g, ' ').trim() : '', issued: issued.trim() };
   }
 
-  root.Radar = { TZ, HOUR, BASES, SPOTS, TRIP, local, localTime, baseForToday, windowFor, sunAlt, darkness, kpToP, parseKp, kpAt, reduceOvation, ovationNear, evaluate, recommend, haversineKm, effCloud, detClear, parseFmiObs, nearestObs, obsClear, parse27, parse3day, parseKpNow, RINDEX_THRESH, rIndexToP, level, skyWord, auroraWord, coldAdvice, moonState, moonFactor, moonWord, parseFmiSeries, hindsight };
+  root.Radar = { TZ, HOUR, BASES, SPOTS, TRIP, local, localTime, baseForToday, windowFor, clampWindow, dayState, nightFactor, howText, mapsUrl, goodSpan, sunAlt, darkness, kpToP, parseKp, kpAt, reduceOvation, ovationNear, evaluate, recommend, haversineKm, effCloud, detClear, parseFmiObs, nearestObs, obsClear, parse27, parse3day, parseKpNow, RINDEX_THRESH, rIndexToP, level, skyWord, auroraWord, coldAdvice, moonState, moonFactor, moonWord, parseFmiSeries, hindsight };
 })(typeof window !== 'undefined' ? window : globalThis);

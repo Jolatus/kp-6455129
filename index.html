@@ -93,6 +93,12 @@ p { margin: 0; }
 .why b { font-weight: 650; }
 .why span { min-width: 0; color: var(--muted); }
 .note { font-size: 0.86rem; padding: 0.55rem 0.7rem; border-radius: 10px; background: var(--raise); }
+.nowline { display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.6rem; align-items: baseline; font-size: 0.88rem; padding: 0.5rem 0.7rem; border-radius: 10px; background: color-mix(in srgb, var(--aurora) 12%, var(--raise)); }
+.nowline b { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--aurora); }
+.nowline span { min-width: 0; }
+.nowline strong { font-weight: 800; }
+.dayline { font-size: 0.88rem; padding: 0.55rem 0.7rem; border-radius: 10px; background: color-mix(in srgb, var(--clear) 12%, var(--raise)); }
+.fartag { display: inline-block; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--bg); background: var(--warn); border-radius: 5px; padding: 0.05rem 0.35rem; margin-left: 0.4rem; vertical-align: 0.2em; }
 .actions { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; }
 .go { display: inline-flex; align-items: center; gap: 0.4rem; text-decoration: none; font-weight: 650; background: var(--ink); color: var(--bg); padding: 0.5rem 0.9rem; border-radius: 10px; border: 0; cursor: pointer; }
 .go.ghost { background: var(--raise); color: var(--ink); border: 1px solid var(--line); }
@@ -193,6 +199,9 @@ p { margin: 0; }
 .spot .spark i { display: block; background: color-mix(in srgb, var(--chance) 75%, transparent); border-radius: 2px 2px 0 0; min-height: 1px; }
 .spot .spark i.light { background: var(--line); }
 .tag { display: inline-block; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--warn); margin-left: 0.3rem; }
+.list .grp { font-size: 0.82rem; font-weight: 700; color: var(--muted); padding: 0.5rem 0 0.1rem; }
+.list .grp small { display: block; font-weight: 400; font-size: 0.76rem; }
+details.more.sec > summary { font-size: 1rem; }
 
 /* Wecker */
 .watch { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 0.85rem 0.9rem; display: grid; gap: 0.7rem; }
@@ -256,11 +265,7 @@ details.more .inner { display: grid; gap: 0.8rem; }
   </header>
 
   <div class="seg" role="group" aria-label="Wo seid ihr?" id="seg-base"></div>
-  <p class="where">Wo seid ihr gerade? Während der Reise ist die Unterkunft automatisch gewählt.</p>
-  <div class="seg seg-2" role="group" aria-label="Zeitraum" id="seg-mode">
-    <button type="button" data-mode="jetzt" aria-pressed="false">Jetzt (3 Std.)</button>
-    <button type="button" data-mode="nacht" aria-pressed="false">Ganze Nacht</button>
-  </div>
+  <p class="where" id="where">Wo seid ihr gerade? Während der Reise ist die Unterkunft automatisch gewählt.</p>
 
   <section class="ans" id="ans" aria-live="polite">
     <div class="band"><b>Lädt …</b><span></span></div>
@@ -273,12 +278,9 @@ details.more .inner { display: grid; gap: 0.8rem; }
     <p class="small">Tippt auf eine Nacht, um sie oben anzuzeigen. Je weiter weg, desto unsicherer, besonders bei den Wolken.</p>
   </section>
 
-  <section class="block" aria-labelledby="h-past">
-    <h2 class="h" id="h-past">So waren die letzten Nächte</h2>
-    <p class="small">Gemessen statt vorhergesagt: Wolken und Temperatur von der nächsten Wetterstation, Polarlicht-Aktivität aus dem gemessenen Kp. So seht ihr, wie oft es hier aufklart und wie kalt die Nächte wirklich werden.</p>
-    <div class="nights" id="past"></div>
-    <p class="past-sum" id="past-sum"></p>
-    <div id="past-detail"></div>
+  <section class="block" aria-labelledby="h-list">
+    <h2 class="h" id="h-list">Alle Spots, beste zuerst</h2>
+    <ol class="list" id="list"></ol>
   </section>
 
   <section class="block" aria-labelledby="h-map">
@@ -308,35 +310,10 @@ details.more .inner { display: grid; gap: 0.8rem; }
     </div>
   </section>
 
-  <section class="block" aria-labelledby="h-list">
-    <h2 class="h" id="h-list">Alle Spots, beste zuerst</h2>
-    <ol class="list" id="list"></ol>
-  </section>
-
-  <section class="block" aria-labelledby="h-cam">
-    <h2 class="h" id="h-cam">Polarlicht fotografieren mit euren Pixels</h2>
-    <div class="cam">
-      <div class="seg seg-2" role="group" aria-label="Welches Handy?" id="seg-phone">
-        <button type="button" data-phone="p9" aria-pressed="true">Pixel 9 Pro</button>
-        <button type="button" data-phone="p8a" aria-pressed="false">Pixel 8a</button>
-      </div>
-      <div>
-        <p class="q">Wie hell ist das Polarlicht gerade?</p>
-        <div class="seg seg-2" role="group" aria-label="Wie hell ist das Polarlicht?" id="seg-glow">
-          <button type="button" data-glow="schwach" aria-pressed="false">Blass</button>
-          <button type="button" data-glow="mittel" aria-pressed="false">Deutlich</button>
-          <button type="button" data-glow="stark" aria-pressed="false">Hell, tanzt</button>
-        </div>
-        <p class="small" id="cam-hint" style="margin-top:0.3rem"></p>
-      </div>
-      <div id="cam-out"></div>
-    </div>
-  </section>
-
   <section class="block" aria-labelledby="h-wake">
     <h2 class="h" id="h-wake">Polarlicht-Wecker</h2>
     <div class="watch">
-      <p class="lead">Die App prüft alle 10 Minuten die laufende und die nächste Stunde und klingelt, wenn die Chance über eurer Schwelle liegt. Dafür bleibt das Handy mit offener App am Ladekabel liegen. Der Bildschirm bleibt an, aber fast schwarz. Auch ohne offene App weckt euch der Push-Wecker über die App ntfy.</p>
+      <p class="lead">Die App prüft ab der Dunkelheit alle 10 Minuten die laufende und die nächste Stunde an den Spots in der Nähe und klingelt, wenn die Chance über eurer Schwelle liegt. Dafür bleibt das Handy mit offener App am Ladekabel liegen. Der Bildschirm bleibt an, aber fast schwarz. Auch ohne offene App weckt euch der Push-Wecker über die App ntfy. Er schickt außerdem gegen 17 Uhr einen kurzen Ausblick auf die Nacht.</p>
       <label for="w-th">Wecken ab
         <select id="w-th">
           <option value="0.3">30 %</option>
@@ -352,6 +329,38 @@ details.more .inner { display: grid; gap: 0.8rem; }
       </div>
     </div>
   </section>
+
+  <details class="more sec" id="cam-box" open>
+    <summary id="h-cam">Polarlicht fotografieren mit euren Pixels</summary>
+    <div class="inner">
+      <div class="cam">
+        <div class="seg seg-2" role="group" aria-label="Welches Handy?" id="seg-phone">
+          <button type="button" data-phone="p9" aria-pressed="true">Pixel 9 Pro</button>
+          <button type="button" data-phone="p8a" aria-pressed="false">Pixel 8a</button>
+        </div>
+        <div>
+          <p class="q">Wie hell ist das Polarlicht gerade?</p>
+          <div class="seg seg-2" role="group" aria-label="Wie hell ist das Polarlicht?" id="seg-glow">
+            <button type="button" data-glow="schwach" aria-pressed="false">Blass</button>
+            <button type="button" data-glow="mittel" aria-pressed="false">Deutlich</button>
+            <button type="button" data-glow="stark" aria-pressed="false">Hell, tanzt</button>
+          </div>
+          <p class="small" id="cam-hint" style="margin-top:0.3rem"></p>
+        </div>
+        <div id="cam-out"></div>
+      </div>
+    </div>
+  </details>
+
+  <details class="more sec" id="past-box">
+    <summary id="h-past">So waren die letzten Nächte (gemessen)</summary>
+    <div class="inner">
+      <p class="small">Gemessen statt vorhergesagt: Wolken und Temperatur von der nächsten Wetterstation, Polarlicht-Aktivität aus dem gemessenen Kp. So seht ihr, wie oft es hier aufklart und wie kalt die Nächte wirklich werden.</p>
+      <div class="nights" id="past"></div>
+      <p class="past-sum" id="past-sum"></p>
+      <div id="past-detail"></div>
+    </div>
+  </details>
 
   <details class="more">
     <summary>Für Technikfans: Weltraumwetter und Sonnenstürme</summary>
@@ -372,6 +381,9 @@ details.more .inner { display: grid; gap: 0.8rem; }
         <li><b>Himmel klar:</b> 91 Läufe aus zwei Ensemble-Modellen (ECMWF mit 51, ICON mit 40), gezählt wird der Anteil mit unter 40 % Bewölkung. Dazu das 1-km-Modell MET Nordic mit tiefen, mittleren und hohen Wolken getrennt. Davon gehen 8 % ab, weil Eisnebel über kaltem Schnee in den Modellen oft fehlt.</li>
         <li><b>Gemessene Wolken:</b> Meldet eine Wetterstation im Umkreis von 40 km, zieht sie die laufende Stunde zur Hälfte und die nächste zu einem Viertel Richtung Wirklichkeit.</li>
         <li><b>Polarlicht aktiv:</b> Für später die Kp-Vorhersage von NOAA, umgerechnet auf die Breite des Spots. Für die laufende und nächste Stunde vor allem der gemessene Kp der letzten 30 Minuten, dazu Sonnenwind und OVATION.</li>
+        <li><b>Tageszeit:</b> In Lappland ist Polarlicht um 23–24 Uhr am häufigsten. Der Kp-Wert zählt dann voll, am frühen Abend zu 65 %. Deshalb liegt die beste Stunde meist zwischen 21 und 02 Uhr.</li>
+        <li><b>Hingehen oder bleiben:</b> Ein anderer Spot wird empfohlen, wenn er um 3 Punkte plus etwa 1 Punkt je 10 Minuten Weg besser ist als der Platz vor der Tür.</li>
+        <li><b>Weiter weg:</b> Fernziele bis etwa 1,5 Stunden Fahrt (Fahrzeit aus OpenStreetMap-Routing plus 10 % für Winterstraßen). Sie kommen nur in Frage, wenn sie auch die beste Wahl in der Nähe nach derselben Regel schlagen. Der Wecker schaut nur auf die Nähe.</li>
         <li><b>Dunkel:</b> Sonnenstand je Spot und Stunde. Unter −10° zählt voll, zwischen −10° und −6° halb.</li>
         <li><b>Spot:</b> Nordblick und Dunkelheit aus eurer Reiseseite, Faktor 0,6 bis 1,0.</li>
         <li><b>Mond:</b> Höhe und Phase je Stunde. Ein heller, hoher Mond senkt die Chance bei schwachem Polarlicht um bis zu 30 %, bei starkem kaum.</li>
@@ -406,12 +418,22 @@ details.more .inner { display: grid; gap: 0.8rem; }
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="radar-core.js?v=5"></script>
+<script src="radar-core.js?v=6"></script>
 <script>
 (function () {
   'use strict';
   const R = window.Radar;
   const $ = id => document.getElementById(id);
+  /* Uhr der App. Nur zum Testen auf localhost: ?t=2026-11-26T11:00 stellt die Uhr auf diese finnische Ortszeit. */
+  const SHIFT = (() => {
+    try {
+      const q = new URLSearchParams(location.search).get('t');
+      if (!q || !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) return 0;
+      const t = Date.parse(q.length <= 16 ? q + ':00+02:00' : q);
+      return isFinite(t) ? t - Date.now() : 0;
+    } catch (e) { return 0; }
+  })();
+  const nowMs = () => Date.now() + SHIFT;
   const store = {
     get(k) { try { return JSON.parse(localStorage.getItem('pr-' + k)); } catch (e) { return null; } },
     set(k, v) { try { localStorage.setItem('pr-' + k, JSON.stringify(v)); } catch (e) { /* Speicher voll oder gesperrt: ohne Cache weiter */ } }
@@ -425,11 +447,11 @@ details.more .inner { display: grid; gap: 0.8rem; }
   const iso = ms => new Date(ms).toISOString().replace(/\.\d+Z$/, 'Z');
   const BAND = { gut: 'JA, RAUS!', mittel: 'LOHNT EINEN BLICK', klein: 'EHER NICHT', nein: 'LOHNT SICH NICHT', none: 'KEINE DATEN' };
 
-  const tripBase = R.baseForToday(Date.now());
+  const tripBase = R.baseForToday(nowMs());
   const state = {
     base: tripBase || store.get('base') || 'see',
-    mode: store.get('mode') || 'nacht', night: 0,
-    gps: null, focus: null, data: store.get('data2'), loading: false, errors: [],
+    night: 0,
+    gps: null, focus: null, data: store.get('data3'), loading: false, errors: [],
     pastK: -1, phone: store.get('phone') || 'p9', glow: null, grid: store.get('grid')
   };
   if (state.base === 'gps' || !R.BASES[state.base]) state.base = 'see';
@@ -442,17 +464,14 @@ details.more .inner { display: grid; gap: 0.8rem; }
   function renderSeg() {
     const opts = Object.keys(R.BASES).map(k => [k, R.BASES[k].short]).concat([['gps', 'Mein Standort']]);
     $('seg-base').innerHTML = opts.map(([k, n]) => '<button type="button" data-base="' + k + '" aria-pressed="' + (state.base === k) + '">' + esc(n) + (k === tripBase ? '<span class="today" title="heute"></span>' : '') + '</button>').join('');
-    $('seg-mode').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.mode === state.mode && (state.mode === 'jetzt' || state.night === 0))));
+    /* Während der Reise ist die Unterkunft automatisch gewählt, dann braucht es den Hinweis nicht */
+    $('where').hidden = !!tripBase && state.base === tripBase;
   }
   $('seg-base').addEventListener('click', e => {
     const btn = e.target.closest('button'); if (!btn) return;
     const k = btn.dataset.base; state.focus = null;
     if (k === 'gps') { locate(); return; }
     state.base = k; store.set('base', k); renderSeg(); render(); load(false); loadGrid();
-  });
-  $('seg-mode').addEventListener('click', e => {
-    const btn = e.target.closest('button'); if (!btn) return;
-    state.mode = btn.dataset.mode; state.night = 0; store.set('mode', state.mode); renderSeg(); render();
   });
 
   function locate() {
@@ -497,38 +516,50 @@ details.more .inner { display: grid; gap: 0.8rem; }
   }
   function setStamp(txt, off) { const s = $('stamp'); s.textContent = txt; s.classList.toggle('off', !!off); }
 
+  /* Tag oder Nacht am gewählten Ort (Tag = hell und mehr als 1 Stunde bis zur Dunkelheit) */
+  const dayNow = () => { const c = center(); return R.dayState(nowMs(), c.lat, c.lon); };
+  const MAX_AGE = 12 * 3600e3; /* so lange taugt eine gespeicherte Vorhersage noch */
+
   async function load(force) {
     if (state.loading) return;
     const locs = currentLocs(), key = locKey(locs);
-    const d = state.data || {};
-    const fresh = d.at && Date.now() - d.at < 10 * 60e3 && d.key === key && d.hist && d.hist.key === histKey();
+    const d = state.data || {}, ds = dayNow();
+    /* tagsüber reicht ein neuer Stand pro Stunde, nachts alle 10 Minuten */
+    const fresh = d.at && nowMs() - d.at < (ds.day ? 60 : 10) * 60e3 && d.detKey === key && d.ensKey === key && d.hist && d.hist.key === histKey();
     if (fresh && !force) { render(); return; }
     state.loading = true; $('btn-refresh').disabled = true; setStamp('Lädt aktuelle Daten …');
-    const now = Date.now();
+    const now = nowMs();
     const la = locs.map(l => l.lat).join(','), lo = locs.map(l => l.lon).join(',');
     const om = 'latitude=' + la + '&longitude=' + lo + '&forecast_days=3&timezone=GMT';
     const slow = !d.out27At || now - d.out27At > 6 * 3600e3;
     const hKey = histKey(), needHist = !d.hist || d.hist.key !== hKey || now - d.hist.at > 2 * 3600e3;
+    /* Live-Werte (Kp der letzten Minuten, Sonnenwind, Stationen) nur nachts, OVATION (900 KB) nur bei Dunkelheit */
+    const live = !ds.day, none = Promise.resolve(null);
     const jobs = [
       getData('https://api.open-meteo.com/v1/forecast?' + om + '&hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high,temperature_2m,apparent_temperature,wind_speed_10m&models=metno_seamless'),
       getData('https://ensemble-api.open-meteo.com/v1/ensemble?' + om + '&hourly=cloud_cover&models=ecmwf_ifs025,icon_seamless', 'json', 35000),
       getData('https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json'),
-      getData('https://services.swpc.noaa.gov/json/ovation_aurora_latest.json', 'json', 40000),
-      getData('https://services.swpc.noaa.gov/products/summary/solar-wind-mag-field.json'),
-      getData('https://services.swpc.noaa.gov/products/summary/solar-wind-speed.json'),
-      getData('https://services.swpc.noaa.gov/json/planetary_k_index_1m.json'),
-      getData('https://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFeature&storedquery_id=fmi::observations::weather::simple&bbox=20,66,30,70.2&parameters=n_man&starttime=' + iso(now - 40 * 60e3) + '&endtime=' + iso(now), 'text'),
-      slow ? getData('https://services.swpc.noaa.gov/text/27-day-outlook.txt', 'text') : Promise.resolve(null),
-      slow ? getData('https://services.swpc.noaa.gov/text/3-day-forecast.txt', 'text') : Promise.resolve(null),
-      needHist ? getData(histUrl(now), 'text', 30000) : Promise.resolve(null)
+      ds.darkNow ? getData('https://services.swpc.noaa.gov/json/ovation_aurora_latest.json', 'json', 40000) : none,
+      live ? getData('https://services.swpc.noaa.gov/products/summary/solar-wind-mag-field.json') : none,
+      live ? getData('https://services.swpc.noaa.gov/products/summary/solar-wind-speed.json') : none,
+      live ? getData('https://services.swpc.noaa.gov/json/planetary_k_index_1m.json') : none,
+      live ? getData('https://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFeature&storedquery_id=fmi::observations::weather::simple&bbox=20,66,30,70.2&parameters=n_man&starttime=' + iso(now - 40 * 60e3) + '&endtime=' + iso(now), 'text') : none,
+      slow ? getData('https://services.swpc.noaa.gov/text/27-day-outlook.txt', 'text') : none,
+      slow ? getData('https://services.swpc.noaa.gov/text/3-day-forecast.txt', 'text') : none,
+      needHist ? getData(histUrl(now), 'text', 30000) : none
     ];
     const res = await Promise.allSettled(jobs);
     const [det, ens, kp, ov, mag, spd, k1m, obs, o27, d3, hx] = res.map(r => r.status === 'fulfilled' ? r.value : null);
     const next0 = {};
     if (hx) next0.hist = { key: hKey, at: now, st: R.parseFmiSeries(hx).filter(s => s.v.n_man) };
-    const errs = [], next = Object.assign({}, d, next0);
-    if (det && ens) { next.det = [].concat(det); next.ens = [].concat(ens); next.ids = locs.map(l => l.id); next.key = key; next.cloudsAt = now; }
-    else errs.push('Wettervorhersage nicht erreichbar' + (d.cloudsAt && d.key === key ? ', zeige Stand von ' + clock(d.cloudsAt) : ''));
+    const errs = [], next = Object.assign({}, d, next0), ids = locs.map(l => l.id);
+    /* Die beiden Wettermodelle getrennt speichern: Fällt eins aus, bleibt das andere frisch */
+    if (det) { next.det = [].concat(det); next.detKey = key; next.detIds = ids; next.detAt = now; }
+    if (ens) { next.ens = [].concat(ens); next.ensKey = key; next.ensIds = ids; next.ensAt = now; }
+    const hasDet = next.detKey === key, hasEns = next.ensKey === key;
+    if (!det && !ens) errs.push('Wettervorhersage nicht erreichbar' + (hasDet || hasEns ? ', zeige Stand von ' + clock(Math.max(hasDet ? next.detAt : 0, hasEns ? next.ensAt : 0)) : ''));
+    else if (!ens) errs.push('Ensemble nicht erreichbar' + (hasEns ? ', Stand ' + clock(next.ensAt) : ', Wolken nur aus einem Modell'));
+    else if (!det) errs.push('1-km-Modell nicht erreichbar' + (hasDet ? ', Stand ' + clock(next.detAt) : ''));
     if (kp) next.kp = R.parseKp(kp); else errs.push('Kp-Vorhersage nicht erreichbar');
     if (ov) next.ov = R.reduceOvation(ov);
     if (mag && mag[0]) next.mag = { bz: +mag[0].bz_gsm, bt: +mag[0].bt, t: Date.parse(mag[0].time_tag) };
@@ -539,48 +570,39 @@ details.more .inner { display: grid; gap: 0.8rem; }
     if (d3) next.d3 = R.parse3day(d3);
     if (det || ens || kp || ov) next.at = now;
     state.data = next; state.errors = errs; state.loading = false; $('btn-refresh').disabled = false;
-    store.set('data2', next);
+    store.set('data3', next);
     render();
   }
   $('btn-refresh').addEventListener('click', () => { load(true); loadGrid(true); });
 
   /* ---------- Rechnen ---------- */
-  function compute(win) {
-    const d = state.data; if (!d || !d.det || !d.ens) return null;
-    const locs = currentLocs();
-    if (d.key !== locKey(locs)) return { missing: true };
-    const idx = locs.map(l => (d.ids || []).indexOf(l.id));
-    const now = Date.now();
-    win = win || R.windowFor(state.mode, now, state.night);
+  /* win: eigenes Zeitfenster, sonst die gewählte Nacht (ab jetzt). opts.near: nur Spots in der Nähe empfehlen */
+  function compute(win, opts) {
+    const d = state.data; if (!d) return null;
+    const locs = currentLocs(), key = locKey(locs), now = nowMs();
+    const okDet = d.det && d.detKey === key && now - d.detAt < MAX_AGE, okEns = d.ens && d.ensKey === key && now - d.ensAt < MAX_AGE;
+    if (!okDet && !okEns) return d.det || d.ens ? { missing: true } : null;
+    const pickRows = (arr, ids) => locs.map(l => arr[(ids || []).indexOf(l.id)] || null);
+    win = win || R.clampWindow(R.windowFor('nacht', now, state.night), state.base);
     const obs = d.obs && d.obsAt && now - d.obsAt < 75 * 60e3 ? locs.map(l => R.nearestObs(d.obs, l.lat, l.lon, 40)) : null;
     const results = R.evaluate({
-      locs, det: idx.map(i => d.det[i]), ens: idx.map(i => d.ens[i]), kp: d.kp || [], ov: d.ov,
+      locs, det: okDet ? pickRows(d.det, d.detIds) : null, ens: okEns ? pickRows(d.ens, d.ensIds) : null, kp: d.kp || [], ov: d.ov,
       bz: d.mag && now - d.mag.t < 90 * 60e3 ? d.mag.bz : null, kpNow: d.kpNow, obs, now, win
     });
-    return { results, win, rec: R.recommend(results), now };
+    return { results, win, rec: R.recommend(results, opts), now };
   }
   /* Das Ziel: ausgewählter Spot, sonst Empfehlung */
   function pick(c) {
     if (!c || c.missing || !c.rec) return null;
     const f = state.focus && c.results.find(x => x.loc.id === state.focus);
     if (f) return { r: f, verdict: 'focus', rec: c.rec };
-    return { r: c.rec.verdict === 'fahren' ? c.rec.best : c.rec.home, verdict: c.rec.verdict, rec: c.rec };
+    return { r: c.rec.target, verdict: c.rec.verdict, rec: c.rec };
   }
 
   /* ---------- Antwort oben ---------- */
-  const verbs = { 'zu Fuß': 'zu Fuß', 'Auto': 'mit dem Auto' };
-  const howText = l => l.min === 0 ? 'direkt vor der Tür' : l.min + ' Min. ' + (verbs[l.how] || l.how);
-  const mapsUrl = l => 'https://www.google.com/maps/dir/?api=1&destination=' + l.lat + ',' + l.lon;
-  /* Zusammenhängendes gutes Zeitfenster um die beste Stunde */
-  function goodSpan(r) {
-    if (!r.best) return null;
-    const i = r.rows.indexOf(r.best), lim = r.best.c * 0.8;
-    let a = i, b = i;
-    while (a > 0 && r.rows[a - 1].c != null && r.rows[a - 1].c >= lim) a--;
-    while (b < r.rows.length - 1 && r.rows[b + 1].c != null && r.rows[b + 1].c >= lim) b++;
-    return { from: r.rows[a].t, to: r.rows[b].t + R.HOUR };
-  }
+  const howText = R.howText, mapsUrl = R.mapsUrl, goodSpan = R.goodSpan;
   const firstDark = r => { const x = r.rows.find(y => y.dark > 0); return x ? x.t : null; };
+  const spanTxt = sp => sp && sp.to - sp.from > R.HOUR ? hh(sp.from) + '–' + hh(sp.to) + ' Uhr' : '';
 
   function stripHTML(r) {
     return '<div class="hours"><h3>Stunde für Stunde an diesem Spot</h3><div class="strip" role="img" aria-label="Stundenverlauf ' + esc(r.loc.name) + '">' + r.rows.map(x => {
@@ -594,28 +616,45 @@ details.more .inner { display: grid; gap: 0.8rem; }
     }).join('') + '</div><div class="legend"><span style="--c:var(--clear)">Himmel klar</span><span style="--c:var(--aurora)">Polarlicht aktiv</span><span style="--c:var(--chance)">Chance</span><span style="--c:var(--cold)">Temperatur</span></div></div>';
   }
 
+  /* „Gerade jetzt“: laufende Stunde am Ziel plus die frischesten Messwerte. Tagsüber stattdessen ein Hinweis. */
+  function nowLine(r, ds) {
+    if (ds.day) {
+      const look = ds.darkFrom ? ds.darkFrom - R.HOUR : null;
+      return '<p class="dayline"><b>Jetzt ist Tag.</b> ' + (ds.darkFrom ? 'Dunkel ab etwa ' + clock(ds.darkFrom) + ' Uhr. Ab ' + hh(look) + ' Uhr lohnt ein neuer Blick, dann sind die Wolken für den Abend genauer.' : 'Heute wird es nicht mehr richtig dunkel.') + '</p>';
+    }
+    if (!ds.darkNow) return '<div class="nowline"><b>Gerade</b><span>Noch Dämmerung, dunkel ab ' + clock(ds.darkFrom) + ' Uhr.</span></div>';
+    const d = state.data || {}, now = nowMs(), h0 = Math.floor(now / R.HOUR) * R.HOUR, bits = [];
+    const cn = compute({ start: h0, end: h0, label: 'jetzt' });
+    const rn = cn && cn.results ? cn.results.find(x => x.loc.id === r.loc.id) : null;
+    if (rn && rn.chance != null) bits.push('<strong>' + pct(rn.chance) + '</strong> in dieser Stunde');
+    if (d.kpNow && now - d.kpNow.t < 60 * 60e3) bits.push('Kp gemessen ' + num(d.kpNow.kp, 1) + ' (' + kpWord(d.kpNow.kp) + ')');
+    if (d.mag && isFinite(d.mag.bz) && now - d.mag.t < 90 * 60e3) bits.push('Sonnenwind ' + (d.mag.bz <= -5 ? 'günstig' : d.mag.bz < 0 ? 'leicht günstig' : 'ungünstig'));
+    const st = d.obs && d.obsAt && now - d.obsAt < 75 * 60e3 ? R.nearestObs(d.obs, r.loc.lat, r.loc.lon, 40) : null;
+    if (st) bits.push('Station ' + Math.round(st.km) + ' km: ' + Math.round(st.n) + '/8 bewölkt');
+    return bits.length ? '<div class="nowline"><b>Gerade jetzt</b><span>' + bits.join(' · ') + '</span></div>' : '';
+  }
+
   function renderAnswer(c) {
     const el = $('ans');
     const set = (lv, band, right, body) => { el.className = 'ans lv-' + lv; el.innerHTML = '<div class="band"><b>' + esc(band) + '</b><span>' + esc(right || '') + '</span></div><div class="ans-body">' + body + '</div>'; };
     if (!c) { set('klein', state.loading ? 'LÄDT …' : 'KEINE DATEN', '', '<p class="lead">' + (state.loading ? 'Wolken, Polarlicht, Dunkelheit und Kälte werden geladen.' : 'Prüft die Verbindung und tippt auf „Neu laden“.') + '</p>'); return; }
     if (c.missing) { set('klein', 'NEUE DATEN NÖTIG', '', '<p class="lead">Für diesen Standort werden gerade Daten geladen. Falls nichts passiert: „Neu laden“.</p>'); return; }
+    const win = c.win, ds = dayNow(), tonight = state.night === 0;
+    if (win.until != null && win.end < win.start) { set('hell', 'FENSTER VORBEI', win.label, '<p class="lead">Abfahrt um ' + win.until + ' Uhr. Für heute ist das Polarlicht-Fenster hier vorbei. Gute Heimreise!</p>'); return; }
     const p = pick(c); if (!p) { set('klein', 'KEINE DATEN', '', '<p class="lead">Für diesen Zeitraum fehlen Daten.</p>'); return; }
-    const r = p.r, win = c.win;
-    const label = (p.verdict === 'focus' ? 'Ausgewählter Spot · ' : '') + win.label;
-    if (p.verdict === 'hell' && state.mode === 'jetzt') {
-      const tonight = pick(compute(R.windowFor('nacht', Date.now(), 0)));
-      set('hell', 'NOCH HELL', label, '<p class="lead">Jetzt ist es zu hell für Polarlicht.' + (tonight ? ' Heute Nacht: <b>' + esc(R.level(tonight.r.chance).word) + ' (' + pct(tonight.r.chance) + ')</b> bei ' + esc(tonight.r.loc.name) + '.' : '') + '</p><div class="actions"><button type="button" class="go" id="to-night">Heute Nacht ansehen</button></div>');
-      $('to-night').addEventListener('click', () => { state.mode = 'nacht'; state.night = 0; renderSeg(); render(); });
-      return;
-    }
+    const r = p.r;
+    if (p.verdict === 'hell') { set('hell', 'NOCH HELL', win.label, '<p class="lead">In diesem Zeitraum wird es nicht dunkel genug für Polarlicht.' + (ds.darkFrom ? ' Dunkel ab ' + clock(ds.darkFrom) + ' Uhr.' : '') + '</p>'); return; }
     const lv = R.level(r.chance), span = goodSpan(r), dark0 = firstDark(r);
+    const outlook = tonight && ds.day;
+    const right = (p.verdict === 'focus' ? 'Ausgewählt · ' : '') + win.label + (outlook && ds.darkFrom ? ' · dunkel ab ' + clock(ds.darkFrom) : spanTxt(span) ? ' · ' + spanTxt(span) : '');
     const at = r.best || r.rows.find(x => x.dark > 0) || r.rows[0];
     const tAt = at && at.temp != null ? at.temp : r.tMin, fAt = at && at.feels != null ? at.feels : r.feelsMin;
     const go = lv.key === 'gut' || lv.key === 'mittel' || p.verdict === 'focus';
-    let html = '<div class="facts">';
+    let html = tonight ? nowLine(r, ds) : '';
+    html += '<div class="facts">';
     if (go) {
-      html += '<div class="fact"><span class="k">Wohin</span><span class="v big">' + esc(r.loc.name) + '</span></div>';
-      html += '<div class="fact"><span class="k">Wann</span><span class="v">' + (r.best ? 'am besten ' + hh(r.best.t) + ' Uhr' : '–') + (span && span.to - span.from > R.HOUR ? '<small>gut von ' + hh(span.from) + ' bis ' + hh(span.to) + ' Uhr</small>' : '') + '</span></div>';
+      html += '<div class="fact"><span class="k">Wohin</span><span class="v big">' + esc(r.loc.name) + (r.loc.far ? '<span class="fartag">weiter weg</span>' : '') + '</span></div>';
+      html += '<div class="fact"><span class="k">Wann</span><span class="v">' + (r.best ? 'am besten ' + hh(r.best.t) + ' Uhr' : '–') + (spanTxt(span) ? '<small>gut von ' + hh(span.from) + ' bis ' + hh(span.to) + ' Uhr</small>' : '') + '</span></div>';
       html += '<div class="fact"><span class="k">Wie weit</span><span class="v">' + esc(howText(r.loc)) + '</span></div>';
     } else {
       html += '<div class="fact"><span class="k">Kurz</span><span class="v">' + (lv.key === 'klein' ? 'Kleine Chance. Wenn ihr ohnehin wach seid: ein Blick nach Norden lohnt.' : 'Heute lohnt sich das Warten kaum. Polarlicht-Wecker an lassen und schlafen gehen.') + '<small>Bester Spot: ' + esc(r.loc.name) + (r.best ? ', ' + hh(r.best.t) + ' Uhr' : '') + '</small></span></div>';
@@ -627,35 +666,35 @@ details.more .inner { display: grid; gap: 0.8rem; }
     html += '<ul class="why" aria-label="Warum">' +
       '<li class="' + cls(r.pClear, 0.6, 0.35) + '"><b>Himmel</b><span>' + esc(R.skyWord(r.pClear)) + ' (' + pct(r.pClear) + ')</span></li>' +
       '<li class="' + cls(r.pAur, 0.6, 0.35) + '"><b>Polarlicht</b><span>' + esc(R.auroraWord(r.pAur)) + '</span></li>' +
-      '<li class="' + (r.dark ? 'ok' : 'bad') + '"><b>Dunkelheit</b><span>' + (dark0 ? (dark0 <= Date.now() ? 'jetzt dunkel genug' : 'dunkel ab ' + hh(dark0) + ' Uhr') : 'zu hell') + '</span></li>' +
+      '<li class="' + (r.dark ? 'ok' : 'bad') + '"><b>Dunkelheit</b><span>' + (tonight && ds.darkNow ? 'jetzt dunkel genug' : tonight && ds.darkFrom && ds.darkFrom - nowMs() < 20 * R.HOUR ? 'dunkel ab ' + clock(ds.darkFrom) + ' Uhr' : dark0 ? 'dunkel ab ' + hh(dark0) + ' Uhr' : 'zu hell') + '</span></li>' +
       (at && at.moon ? (mw => '<li class="' + mw.cls + '"><b>Mond</b><span>' + esc(mw.text) + '</span></li>')(R.moonWord(at.moon)) : '') +
       '<li class="' + (fAt == null ? '' : fAt > -20 ? 'ok' : fAt > -30 ? 'mid' : 'bad') + '"><b>Kälte</b><span>' + esc(R.coldAdvice(fAt)) + '</span></li></ul>';
     html += stripHTML(r);
-    const notes = [];
-    if (p.verdict === 'bleiben' && p.rec.best !== p.rec.home) notes.push('Weiter wegfahren bringt kaum mehr: ' + p.rec.best.loc.name + ' (' + howText(p.rec.best.loc) + ') liegt bei ' + pct(p.rec.best.chance) + '.');
-    if (p.verdict === 'fahren') notes.push('Die Fahrt lohnt sich: ' + (p.rec.home.loc.min === 0 ? 'vor der Tür' : p.rec.home.loc.name) + ' liegt nur bei ' + pct(p.rec.home.chance) + '.');
-    const obsNow = r.rows.find(x => x.obsW > 0);
-    if (obsNow && state.data.obs) { const st = R.nearestObs(state.data.obs, r.loc.lat, r.loc.lon, 40); if (st) notes.push('Eine Wetterstation in ' + Math.round(st.km) + ' km meldet gerade ' + Math.round(st.n) + ' von 8 Achteln Bewölkung.'); }
+    const notes = [], rec = p.rec;
+    if (p.verdict === 'fahren' && rec.far) notes.push('In der Nähe höchstens ' + pct(rec.near.chance) + ' (' + rec.near.loc.name + '). Die lange Fahrt lohnt sich nur, wenn die Straßen frei sind und ihr fit seid.');
+    else if (p.verdict === 'fahren') notes.push((r.loc.min <= 10 ? 'Der kurze Weg lohnt sich: ' : 'Die Fahrt lohnt sich: ') + (rec.home.loc.min === 0 ? 'vor der Tür' : rec.home.loc.name) + ' liegt nur bei ' + pct(rec.home.chance) + '.');
+    if (p.verdict === 'bleiben' && rec.best !== rec.home) notes.push('Weiter weg bringt kaum mehr: ' + rec.best.loc.name + ' (' + howText(rec.best.loc) + ') liegt bei ' + pct(rec.best.chance) + '.');
+    if (win.until != null) notes.push('Abfahrt um ' + win.until + ' Uhr, gerechnet wird bis dahin.');
     if (r.loc.lake) notes.push('Auf dem Seeeis ist es in klaren Nächten oft 3–5 °C kälter als angegeben.');
     if (r.loc.note) notes.push(r.loc.note);
     if (notes.length) html += '<p class="note">' + esc(notes.join(' ')) + '</p>';
     html += '<div class="actions">' + (r.loc.id !== 'GPS' && r.loc.min > 0 ? '<a class="go" href="' + mapsUrl(r.loc) + '" target="_blank" rel="noopener">Route in Google Maps ↗</a>' : '') +
       '<button type="button" class="go ghost" id="to-map">Auf der Karte zeigen</button>' +
       (p.verdict === 'focus' ? '<button type="button" class="linkbtn" id="unfocus">Zurück zur Empfehlung</button>' : '') + '</div>';
-    set(lv.key, go ? BAND[lv.key] : BAND[lv.key], label, html);
+    set(lv.key, outlook ? 'AUSBLICK: ' + lv.word.toUpperCase() : BAND[lv.key], right, html);
     const u = $('unfocus'); if (u) u.addEventListener('click', () => { state.focus = null; render(); });
-    $('to-map').addEventListener('click', () => { $('h-map').scrollIntoView({ block: 'start' }); if (map.ready) map.m.setView([r.loc.lat, r.loc.lon], 11); });
+    $('to-map').addEventListener('click', () => { $('h-map').scrollIntoView({ block: 'start' }); if (map.ready) map.m.setView([r.loc.lat, r.loc.lon], r.loc.far ? 9 : 11); });
   }
 
   /* ---------- Nächste Nächte ---------- */
   function renderNights() {
     const out = [];
     for (let k = 0; k < 3; k++) {
-      const win = R.windowFor('nacht', Date.now(), k), c = compute(win), p = pick(c);
-      const active = state.mode === 'nacht' && state.night === k;
-      if (!p) { out.push('<button type="button" class="night" data-k="' + k + '" aria-pressed="' + active + '"><span class="d">' + esc(win.label) + '</span><b>–</b><span class="w">keine Daten</span></button>'); continue; }
-      const lv = R.level(p.r.chance);
-      out.push('<button type="button" class="night lv-' + lv.key + '" data-k="' + k + '" aria-pressed="' + active + '"><span class="d">' + esc(win.label) + '</span><b>' + pct(p.r.chance) + '</b><span class="w">' + esc(lv.word) + '</span><small>' + esc(p.r.loc.name) + (p.r.tMin != null ? ' · bis ' + deg(p.r.tMin) : '') + (p.r.best && p.r.best.moon && p.r.best.moon.light >= 0.6 ? ' · Mond hell' : '') + '</small></button>');
+      const win = R.clampWindow(R.windowFor('nacht', nowMs(), k), state.base), c = compute(win), p = c && !c.missing && c.rec ? { r: c.rec.target } : null;
+      const active = state.night === k;
+      if (!p || p.r.chance == null) { out.push('<button type="button" class="night" data-k="' + k + '" aria-pressed="' + active + '"><span class="d">' + esc(win.label) + '</span><b>–</b><span class="w">keine Daten</span></button>'); continue; }
+      const lv = R.level(p.r.chance), sp = lv.key === 'nein' ? '' : spanTxt(goodSpan(p.r));
+      out.push('<button type="button" class="night lv-' + lv.key + '" data-k="' + k + '" aria-pressed="' + active + '"><span class="d">' + esc(win.label) + '</span><b>' + pct(p.r.chance) + '</b><span class="w">' + esc(lv.word) + '</span><small>' + (sp ? esc(sp) + '<br>' : '') + esc(p.r.loc.name) + (p.r.loc.far ? ' (weiter weg)' : '') + (p.r.tMin != null ? ' · bis ' + deg(p.r.tMin) : '') + (p.r.best && p.r.best.moon && p.r.best.moon.light >= 0.6 ? ' · Mond hell' : '') + '</small></button>');
     }
     $('nights').innerHTML = out.join('');
   }
@@ -664,7 +703,7 @@ details.more .inner { display: grid; gap: 0.8rem; }
   const PAST_WORD = { gut: 'Gute Nacht', mittel: 'Teils gut', klein: 'Eher schlecht', nein: 'Nichts zu sehen', none: 'Keine Messung' };
   const tShort = v => v == null ? '' : (Math.round(v) < 0 ? '−' : '') + Math.abs(Math.round(v)) + '°';
   function pastNights() {
-    const d = state.data || {}, c = center(), now = Date.now();
+    const d = state.data || {}, c = center(), now = nowMs();
     if (!d.hist || d.hist.key !== histKey()) return null;
     return [-1, -2, -3].map(k => { const win = R.windowFor('nacht', now, k); return { k, win, h: R.hindsight({ stations: d.hist.st, kp: d.kp || [], lat: c.lat, lon: c.lon, win }) }; });
   }
@@ -703,7 +742,7 @@ details.more .inner { display: grid; gap: 0.8rem; }
   });
   $('nights').addEventListener('click', e => {
     const b = e.target.closest('.night'); if (!b) return;
-    state.mode = 'nacht'; state.night = +b.dataset.k; state.focus = null; renderSeg(); render();
+    state.night = +b.dataset.k; state.focus = null; render();
     $('ans').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
   });
 
@@ -712,15 +751,17 @@ details.more .inner { display: grid; gap: 0.8rem; }
     const el = $('list');
     if (!c || c.missing) { el.innerHTML = ''; return; }
     const sorted = c.results.slice().sort((a, b) => (b.chance == null ? -1 : b.chance) - (a.chance == null ? -1 : a.chance));
-    el.innerHTML = sorted.map(r => {
+    const item = r => {
       const l = r.loc, lv = R.level(r.chance);
       const spark = r.rows.map(x => x.dark === 0 ? '<i class="light" style="height:2px"></i>' : '<i style="height:' + Math.max(2, Math.round((x.c || 0) * 100)) + '%"></i>').join('');
       return '<li><button type="button" class="spot lv-' + lv.key + '" data-id="' + esc(l.id) + '" aria-pressed="' + (state.focus === l.id) + '">' +
         '<span class="nm">' + esc(l.name) + (l.fire ? '<span class="tag">Feuer</span>' : '') + (l.noRec ? '<span class="tag">nur mit Spur</span>' : '') + '</span>' +
         '<span class="pc">' + pct(r.chance) + '<small>' + esc(lv.short) + '</small></span>' +
-        '<span class="mt">' + esc(howText(l)) + ' · Himmel ' + pct(r.pClear) + (r.tMin != null ? ' · bis ' + deg(r.tMin) : '') + (l.km ? ' · ' + Math.round(l.km) + ' km' : '') + '</span>' +
+        '<span class="mt">' + esc(howText(l)) + (r.best ? ' · am besten ' + hh(r.best.t) + ' Uhr' : '') + ' · Himmel ' + pct(r.pClear) + (r.tMin != null ? ' · bis ' + deg(r.tMin) : '') + (l.km ? ' · ' + Math.round(l.km) + ' km' : '') + '</span>' +
         '<span class="spark" aria-hidden="true">' + spark + '</span></button></li>';
-    }).join('');
+    };
+    const near = sorted.filter(r => !r.loc.far), far = sorted.filter(r => r.loc.far);
+    el.innerHTML = near.map(item).join('') + (far.length ? '<li class="grp">Weiter weg, bis ca. 1,5 Std. Fahrt<small>Nur, wenn es rund um die Unterkunft zu ist. Vorher tanken, nur in Parkbuchten halten.</small></li>' + far.map(item).join('') : '');
   }
   $('list').addEventListener('click', e => {
     const b = e.target.closest('.spot'); if (!b) return;
@@ -771,7 +812,7 @@ details.more .inner { display: grid; gap: 0.8rem; }
   };
   const GLOW_WORD = { schwach: 'blasses Polarlicht', mittel: 'deutliches Polarlicht', stark: 'helles, tanzendes Polarlicht' };
   function autoGlow() {
-    const p = pick(compute(R.windowFor('nacht', Date.now(), 0)));
+    const p = pick(compute(R.windowFor('nacht', nowMs(), 0)));
     const k = p && p.r.best ? p.r.best.kp : p && p.r.rows.length ? Math.max(...p.r.rows.map(x => x.kp || 0)) : null;
     return { glow: k == null ? 'mittel' : k >= 4.5 ? 'stark' : k >= 2.5 ? 'mittel' : 'schwach', kp: k };
   }
@@ -819,7 +860,7 @@ details.more .inner { display: grid; gap: 0.8rem; }
         await Promise.all(keys.slice(i, i + 40).map(k => { const [o, l] = idx.kacheln[k]; return c.put('https://tile.openstreetmap.org/' + k + '.png', new Response(bin.slice(o, o + l), { headers: { 'Content-Type': 'image/png' } })); }));
         s.textContent = 'Speichere … ' + Math.min(100, Math.round((i + 40) / keys.length * 100)) + ' %';
       }
-      store.set('tilesAt', Date.now());
+      store.set('tilesAt', nowMs());
       try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { /* Browser entscheidet selbst */ }
     } catch (e) { b.disabled = false; s.textContent = 'Speichern hat nicht geklappt. Mit Netz noch einmal tippen.'; return; }
     b.disabled = false; offState();
@@ -829,14 +870,20 @@ details.more .inner { display: grid; gap: 0.8rem; }
   /* ---------- Technik ---------- */
   const kpWord = k => k >= 5 ? 'Sturm' : k >= 4 ? 'aktiv' : k >= 2 ? 'leicht aktiv' : 'ruhig';
   function renderSW(c) {
-    const d = state.data || {}, now = Date.now(), tiles = [], ref = center();
-    if (d.kpNow && now - d.kpNow.t < 60 * 60e3) tiles.push(['Aktivität jetzt', kpWord(d.kpNow.kp), 'Kp ' + num(d.kpNow.kp, 1) + ', Mittel der letzten 30 Min.']);
+    const d = state.data || {}, now = nowMs(), tiles = [], ref = center(), ds = dayNow();
+    if (ds.day) tiles.push(['Dunkel ab', ds.darkFrom ? clock(ds.darkFrom) + ' Uhr' : '–', 'Sonne unter −6°, ab dann ist Polarlicht sichtbar']);
+    else if (d.kpNow && now - d.kpNow.t < 60 * 60e3) tiles.push(['Aktivität jetzt', kpWord(d.kpNow.kp), 'Kp ' + num(d.kpNow.kp, 1) + ', Mittel der letzten 30 Min.']);
     else tiles.push(['Aktivität jetzt', '–', 'keine aktuellen Daten']);
     if (d.kp && d.kp.length) {
       let kMax = 0, tMax = null; const w = c && c.win ? c.win : R.windowFor('nacht', now, 0);
       for (let t = Math.max(w.start, now); t <= w.end; t += R.HOUR) { const k = R.kpAt(d.kp, t); if (k > kMax) { kMax = k; tMax = t; } }
       tiles.push(['Erwartet', kpWord(kMax), 'Kp bis ' + num(kMax, 1) + (tMax ? ' ab ' + hh(tMax) + ' Uhr' : '')]);
     } else tiles.push(['Erwartet', '–', 'keine Daten']);
+    if (ds.day) {
+      tiles.push(['Live-Werte', 'ab Dunkelheit', 'Sonnenwind, Kp der letzten Minuten und das Polarlicht-Oval lädt die App erst abends.']);
+      $('sw').innerHTML = tiles.map(([l, b, s]) => '<div class="tile"><span class="l">' + l + '</span><b>' + esc(b) + '</b><small>' + esc(s) + '</small></div>').join('');
+      return;
+    }
     if (d.mag && isFinite(d.mag.bz)) {
       const bz = d.mag.bz, old = now - d.mag.t > 90 * 60e3;
       tiles.push(['Sonnenwind', bz <= -5 ? 'günstig' : bz < 0 ? 'leicht günstig' : 'ungünstig', 'Bz ' + (bz > 0 ? '+' : '') + num(bz, 0) + ' nT' + (d.speed ? ', ' + Math.round(d.speed.v) + ' km/s' : '') + (old ? ', veraltet' : '')]);
@@ -848,7 +895,7 @@ details.more .inner { display: grid; gap: 0.8rem; }
   function renderKp() {
     const d = state.data || {}, el = $('kp-chart');
     if (!d.kp || !d.kp.length) { el.innerHTML = '<p class="small">Keine Kp-Daten.</p>'; return; }
-    const now = Date.now(), from = now - 24 * 3600e3;
+    const now = nowMs(), from = now - 24 * 3600e3;
     const rows = d.kp.filter(r => r.t + 3 * 3600e3 > from);
     const W = 520, H = 150, L = 22, B = 22, T = 8, n = rows.length, bw = (W - L - 4) / n;
     const y = k => T + (H - T - B) * (1 - Math.min(9, k) / 9);
@@ -913,6 +960,9 @@ details.more .inner { display: grid; gap: 0.8rem; }
     map.ready = true;
     const c = center(); m.setView([c.lat, c.lon], 9);
     explainMap();
+    /* Wolkenraster erst laden, wenn die Karte in die Nähe des sichtbaren Bereichs kommt */
+    map.visible = !('IntersectionObserver' in window);
+    if (!map.visible) new IntersectionObserver(es => { const v = es.some(e => e.isIntersecting); if (v && !map.visible) { map.visible = true; loadGrid(); } else map.visible = v; }, { rootMargin: '600px 0px' }).observe($('map'));
   }
   $('seg-layer').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b || !map.ready) return;
@@ -939,23 +989,29 @@ details.more .inner { display: grid; gap: 0.8rem; }
     $('howto').innerHTML = H.map(x => '<li>' + x + '</li>').join('');
   }
 
-  /* Raster rund um den Standort aus dem 1-km-Modell MET Nordic: Wolken und Temperatur, 12 Stunden */
+  /* Raster rund um den Standort aus dem 1-km-Modell MET Nordic: Wolken und Temperatur, 12 Stunden.
+     Zählt bei Open-Meteo wie 256 Abrufe, deshalb nur laden, wenn die Karte in Sicht kommt, und nicht zu oft.
+     Tagsüber beginnt es mit der Dunkelheit, damit der Regler den Abend zeigt. */
   async function loadGrid(force) {
     if (!map.ready) return;
-    const c = center(), key = c.lat.toFixed(2) + ',' + c.lon.toFixed(2);
+    if (!map.visible) { if (force) map.forceNext = true; drawOverlay(); return; }
+    force = force || map.forceNext; map.forceNext = false;
+    const c = center(), key = c.lat.toFixed(2) + ',' + c.lon.toFixed(2), ds = dayNow();
     const g = state.grid;
-    if (!force && g && g.key === key && Date.now() - g.at < 30 * 60e3) { drawOverlay(); return; }
+    if (!force && g && g.key === key && nowMs() - g.at < (ds.day ? 90 : 45) * 60e3) { drawOverlay(); return; }
+    const h0 = Math.floor(nowMs() / R.HOUR) * R.HOUR, t0 = ds.day && ds.darkFrom ? Math.floor(ds.darkFrom / R.HOUR) * R.HOUR : h0;
+    const hourIso = t => new Date(t).toISOString().slice(0, 13) + ':00';
     const NY = 16, NX = 16, dLat = 0.62, dLon = 1.55, lats = [], lons = [];
     for (let i = 0; i < NY; i++) for (let j = 0; j < NX; j++) { lats.push((c.lat - dLat + 2 * dLat * i / (NY - 1)).toFixed(3)); lons.push((c.lon - dLon + 2 * dLon * j / (NX - 1)).toFixed(3)); }
     try {
-      const j = await getData('https://api.open-meteo.com/v1/forecast?latitude=' + lats.join(',') + '&longitude=' + lons.join(',') + '&hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high,temperature_2m&models=metno_seamless&forecast_hours=13&timezone=GMT', 'json', 30000);
+      const j = await getData('https://api.open-meteo.com/v1/forecast?latitude=' + lats.join(',') + '&longitude=' + lons.join(',') + '&hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high,temperature_2m&models=metno_seamless&start_hour=' + hourIso(t0) + '&end_hour=' + hourIso(t0 + 12 * R.HOUR) + '&timezone=GMT', 'json', 30000);
       const arr = [].concat(j), times = arr[0].hourly.time.map(t => Date.parse(t + 'Z'));
       const eff = times.map((_, k) => arr.map(p => { const h = p.hourly; return Math.round(R.effCloud(h.cloud_cover_low[k], h.cloud_cover_mid[k], h.cloud_cover_high[k])); }));
       const temp = times.map((_, k) => arr.map(p => p.hourly.temperature_2m[k] == null ? null : Math.round(p.hourly.temperature_2m[k] * 10) / 10));
-      state.grid = { key, at: Date.now(), NY, NX, latMin: c.lat - dLat, latMax: c.lat + dLat, lonMin: c.lon - dLon, lonMax: c.lon + dLon, times, eff, temp };
+      state.grid = { key, at: nowMs(), NY, NX, latMin: c.lat - dLat, latMax: c.lat + dLat, lonMin: c.lon - dLon, lonMax: c.lon + dLon, times, eff, temp };
       store.set('grid', state.grid); /* für offline: letzter Stand der Wolkenkarte */
       gridSlider(true);
-      map.m.fitBounds([[c.lat - dLat * 0.8, c.lon - dLon * 0.8], [c.lat + dLat * 0.8, c.lon + dLon * 0.8]]);
+      if (!g || g.key !== key) map.m.fitBounds([[c.lat - dLat * 0.8, c.lon - dLon * 0.8], [c.lat + dLat * 0.8, c.lon + dLon * 0.8]]);
       drawOverlay();
     } catch (e) {
       /* ohne Netz: gespeicherten Stand zeigen, wenn er zum Standort passt */
@@ -965,7 +1021,7 @@ details.more .inner { display: grid; gap: 0.8rem; }
   /* Regler auf die laufende Stunde stellen (bei altem Stand liegen die ersten Stunden in der Vergangenheit) */
   function gridSlider(reset) {
     const g = state.grid; if (!g) return;
-    const h0 = Math.floor(Date.now() / R.HOUR) * R.HOUR, i = g.times.findIndex(t => t >= h0);
+    const h0 = Math.floor(nowMs() / R.HOUR) * R.HOUR, i = g.times.findIndex(t => t >= h0);
     $('map-hour').min = 0; $('map-hour').max = g.times.length - 1;
     if (reset || +$('map-hour').value < i) $('map-hour').value = Math.max(0, i);
   }
@@ -975,7 +1031,7 @@ details.more .inner { display: grid; gap: 0.8rem; }
     const g = state.grid;
     if (!g || (map.layer !== 'cloud' && map.layer !== 'temp')) return;
     const k = Math.min(+$('map-hour').value, g.times.length - 1);
-    const h0 = Math.floor(Date.now() / R.HOUR) * R.HOUR;
+    const h0 = Math.floor(nowMs() / R.HOUR) * R.HOUR;
     $('map-hour-l').textContent = (g.times[k] === h0 ? 'jetzt ' : g.times[k] < h0 ? 'war ' : '') + hh(g.times[k]) + ' Uhr';
     const W = 256, H = 256, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
     const ctx = cv.getContext('2d'), img = ctx.createImageData(W, H);
@@ -1053,24 +1109,29 @@ details.more .inner { display: grid; gap: 0.8rem; }
     } catch (e) { /* Hinweis ist nur ein Zusatz */ }
   }
   function ring(title, msg) {
-    watch.ringing = true; watch.lastAlarm = Date.now();
+    watch.ringing = true; watch.lastAlarm = nowMs();
     showOv(title, msg, true); notify(title, msg);
     const loop = () => { if (!watch.ringing) return; beep(); if (navigator.vibrate) navigator.vibrate([400, 150, 400, 150, 700]); setTimeout(loop, 1600); };
     loop();
   }
   async function watchCheck() {
     if (!watch.on || watch.ringing) return;
+    /* Solange es hell ist: nichts laden, nur warten */
+    const ds = dayNow();
+    if (!ds.darkNow) { showOv('Wache läuft', ds.darkFrom ? 'Noch hell. Ab ' + clock(ds.darkFrom) + ' Uhr prüft die Wache alle 10 Minuten.' : 'Heute wird es nicht dunkel genug.'); return; }
     await load(true);
-    const h0 = Math.floor(Date.now() / R.HOUR) * R.HOUR;
-    const p = pick(compute({ start: h0, end: h0 + R.HOUR, label: 'jetzt' }));
+    const h0 = Math.floor(nowMs() / R.HOUR) * R.HOUR;
+    /* Nur Spots in der Nähe: Für eine lange Fahrt ist es beim Alarm zu spät */
+    const c = compute({ start: h0, end: h0 + R.HOUR, label: 'jetzt' }, { near: true });
+    const p = c && !c.missing && c.rec ? { r: c.rec.target, verdict: c.rec.verdict } : null;
     const th = parseFloat($('w-th').value);
-    if (!p) { showOv('Wache läuft', 'Letzte Prüfung ' + clock(Date.now()) + ': keine Daten. Neuer Versuch in 10 Minuten.'); return; }
+    if (!p) { showOv('Wache läuft', 'Letzte Prüfung ' + clock(nowMs()) + ': keine Daten. Neuer Versuch in 10 Minuten.'); return; }
     const r = p.r, v = r.chance || 0, dark = p.verdict !== 'hell';
-    const cooled = Date.now() > watch.snoozeUntil && (Date.now() - watch.lastAlarm > 60 * 60e3 || v >= watch.lastChance + 0.15);
+    const cooled = nowMs() > watch.snoozeUntil && (nowMs() - watch.lastAlarm > 60 * 60e3 || v >= watch.lastChance + 0.15);
     if (dark && v >= th && cooled) {
       watch.lastChance = v;
       ring('Jetzt raus!', pct(v) + ' Chance bei ' + r.loc.name + ' (' + howText(r.loc) + '). Himmel ' + R.skyWord(r.pClear) + '. ' + (r.tFirst != null ? 'Draußen ' + deg(r.tFirst) + '.' : ''));
-    } else showOv('Wache läuft', 'Letzte Prüfung ' + clock(Date.now()) + ': ' + pct(v) + ' bei ' + r.loc.name + ', Schwelle ' + pct(th) + '. Nächste Prüfung in 10 Minuten.');
+    } else showOv('Wache läuft', 'Letzte Prüfung ' + clock(nowMs()) + ': ' + pct(v) + ' bei ' + r.loc.name + ', Schwelle ' + pct(th) + '. Nächste Prüfung in 10 Minuten.');
   }
   async function startWatch() {
     watch.on = true;
@@ -1092,20 +1153,23 @@ details.more .inner { display: grid; gap: 0.8rem; }
     ring('Probealarm', 'So klingt und vibriert der Wecker. Tippt auf „Aus“.');
   });
   $('ov-stop').addEventListener('click', () => { if (watch.ringing && watch.on) { watch.ringing = false; showOv('Wache läuft', 'Alarm aus. Die Wache prüft weiter alle 10 Minuten.'); } else stopWatch(); });
-  $('ov-snooze').addEventListener('click', () => { watch.ringing = false; watch.snoozeUntil = Date.now() + 30 * 60e3; if (watch.on) showOv('Wache läuft', 'Schlummern bis ' + clock(watch.snoozeUntil) + '.'); else $('ov').hidden = true; });
+  $('ov-snooze').addEventListener('click', () => { watch.ringing = false; watch.snoozeUntil = nowMs() + 30 * 60e3; if (watch.on) showOv('Wache läuft', 'Schlummern bis ' + clock(watch.snoozeUntil) + '.'); else $('ov').hidden = true; });
   document.addEventListener('visibilitychange', () => { if (!document.hidden && watch.on) keepAwake(); });
   $('w-th').value = String(store.get('th') || '0.55');
   $('w-th').addEventListener('change', () => store.set('th', $('w-th').value));
 
   /* ---------- Gesamtablauf ---------- */
+  let lastDay = null;
   function render() {
     renderSeg();
+    const ds = dayNow();
+    if (ds.day !== lastDay) { $('cam-box').open = !ds.day; lastDay = ds.day; }
     const c = compute(); lastCompute = c;
     renderAnswer(c); renderNights(); renderPast(); renderList(c); renderCam(); renderSW(c); renderLinks(); renderKp(); render27(); drawMarkers(c);
     const d = state.data;
     if (state.loading) return;
     if (state.errors.length) setStamp(state.errors.join(' · '), true);
-    else if (d && d.at) setStamp('Stand ' + clock(d.at) + (Date.now() - d.at > 60 * 60e3 ? ' · älter als 1 Stunde, neu laden' : ''), Date.now() - d.at > 60 * 60e3);
+    else if (d && d.at) setStamp('Stand ' + clock(d.at) + (nowMs() - d.at > 60 * 60e3 ? ' · älter als 1 Stunde, neu laden' : ''), nowMs() - d.at > 60 * 60e3);
   }
 
   setRed(!!store.get('red'));
