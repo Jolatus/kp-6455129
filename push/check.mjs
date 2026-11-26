@@ -1,29 +1,39 @@
-/* Polarlicht-Wecker: prüft die nächsten zwei Stunden und schickt bei guter Chance eine Push-Nachricht über ntfy.
-   Läuft als GitHub-Action alle 10 Minuten (siehe .github/workflows/polarlicht-wecker.yml) oder lokal:
+/* Polarlicht-Wecker: läuft als GitHub-Action alle 10 Minuten (siehe .github/workflows/polarlicht-wecker.yml) oder lokal:
      DRY_RUN=1 BASE=see node push/check.mjs
+     DRY_RUN=1 TEST_BRIEFING=1 BASE=farm node push/check.mjs
+   Zwei Aufgaben:
+     1. Abend-Briefing gegen 17 Uhr Ortszeit (leise): Lohnt sich heute Nacht, wann und wo?
+     2. Alarm (laut), wenn es jetzt oder in der nächsten Stunde gut aussieht.
    Umgebungsvariablen:
-     NTFY_TOPIC  geheimer Kanalname in der ntfy-App (Pflicht, außer bei DRY_RUN)
-     THRESHOLD   Schwelle für die Chance, Standard 0.55
-     BASE        Basis außerhalb der Reisedaten: sinetta, see, farm oder koengas
-     SITE_URL    Adresse der Web-App, wird in der Nachricht verlinkt
-     DRY_RUN=1   nichts senden, nur ausgeben
-     FORCE=1     auch senden, wenn in den letzten 90 Minuten schon eine Nachricht kam */
+     NTFY_TOPIC     geheimer Kanalname in der ntfy-App (Pflicht, außer bei DRY_RUN)
+     THRESHOLD      Schwelle für den Alarm, Standard 0.55
+     BASE           Basis außerhalb der Reisedaten: sinetta, see, farm oder rovaniemi
+     SITE_URL       Adresse der Web-App, wird in den Nachrichten verlinkt
+     BRIEFING=0     Abend-Briefing abschalten
+     TEST_BRIEFING  Briefing jetzt sofort schicken (zum Testen)
+     DRY_RUN=1      nichts senden, nur ausgeben
+     FORCE=1        Alarm auch senden, wenn in den letzten 90 Minuten schon einer kam */
 await import(new URL('../radar-core.js', import.meta.url));
 const R = globalThis.Radar;
 const env = process.env;
 const now = Date.now();
 const THRESHOLD = parseFloat(env.THRESHOLD) || 0.55;
 const NTFY = 'https://ntfy.sh';
+const SITE = env.SITE_URL || undefined;
+const L = R.local(now);
 
 /* Testnachricht, um die Einrichtung zu prüfen */
 if (env.TEST_PUSH) {
   if (!env.NTFY_TOPIC) { console.log('NTFY_TOPIC fehlt.'); process.exit(1); }
-  const r = await fetch(NTFY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ topic: env.NTFY_TOPIC, title: 'Polarlicht-Wecker eingerichtet', message: 'Testnachricht. So sieht ein Alarm aus, wenn es draußen losgeht.', priority: 5, tags: ['milky_way', 'test'], click: env.SITE_URL || undefined }) });
+  const r = await fetch(NTFY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ topic: env.NTFY_TOPIC, title: 'Polarlicht-Wecker eingerichtet', message: 'Testnachricht. So sieht ein Alarm aus, wenn es draußen losgeht.', priority: 5, tags: ['milky_way', 'test'], click: SITE, actions: SITE ? [{ action: 'view', label: 'App öffnen', url: SITE }] : undefined }) });
   console.log('Testnachricht gesendet, ntfy:', r.status); process.exit(0);
 }
 
 const base = R.baseForToday(now) || env.BASE;
 if (!base || !R.BASES[base]) { console.log('Außerhalb der Reise und keine BASE gesetzt, nichts zu tun.'); process.exit(0); }
+const B = R.BASES[base];
+/* Basis mit Abfahrtszeit (Rovaniemi): danach nichts mehr melden */
+if (B.until != null && (L.h >= B.until || L.h < 12)) { console.log('Nach der Abfahrt um ' + B.until + ' Uhr, nichts zu tun.'); process.exit(0); }
 
 async function get(url, type = 'json', ms = 30000) {
   const c = new AbortController(), t = setTimeout(() => c.abort(), ms);
@@ -34,15 +44,28 @@ async function get(url, type = 'json', ms = 30000) {
   } finally { clearTimeout(t); }
 }
 const safe = async p => { try { return await p; } catch (e) { console.log('Quelle fehlt:', e.message); return null; } };
+async function recentMessages(since) {
+  if (!env.NTFY_TOPIC) return null;
+  const txt = await safe(get(NTFY + '/' + encodeURIComponent(env.NTFY_TOPIC) + '/json?poll=1&since=' + since, 'text'));
+  if (txt == null) return null;
+  return txt.split('\n').map(l => { try { return JSON.parse(l); } catch (e) { return null; } }).filter(j => j && j.event === 'message');
+}
+async function send(msg) {
+  if (env.DRY_RUN) { console.log('DRY_RUN, nichts gesendet:', JSON.stringify(msg)); return; }
+  if (!env.NTFY_TOPIC) { console.log('NTFY_TOPIC fehlt, nichts gesendet.'); process.exitCode = 1; return; }
+  const res = await fetch(NTFY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ topic: env.NTFY_TOPIC, click: SITE }, msg)) });
+  console.log('ntfy:', res.status);
+}
 
+/* Alle Spots der Basis, auch die Fernziele (für das Briefing) */
 const locs = R.SPOTS.filter(s => s.base[base]).map(s => Object.assign({}, s, { min: s.base[base][0], how: s.base[base][1] }));
 const la = locs.map(l => l.lat).join(','), lo = locs.map(l => l.lon).join(',');
-const om = 'latitude=' + la + '&longitude=' + lo + '&past_days=1&forecast_days=2&timezone=GMT';
+const om = 'latitude=' + la + '&longitude=' + lo + '&past_days=1&forecast_days=3&timezone=GMT';
 const iso = ms => new Date(ms).toISOString().replace(/\.\d+Z$/, 'Z');
 
 const [det, ens, kpRaw, ovRaw, mag, obsXml, rmap, k1m] = await Promise.all([
-  safe(get('https://api.open-meteo.com/v1/forecast?' + om + '&hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high&models=metno_seamless')),
-  safe(get('https://ensemble-api.open-meteo.com/v1/ensemble?' + om + '&hourly=cloud_cover&models=ecmwf_ifs025,icon_seamless')),
+  safe(get('https://api.open-meteo.com/v1/forecast?' + om + '&hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high,temperature_2m,apparent_temperature,wind_speed_10m&models=metno_seamless')),
+  safe(get('https://ensemble-api.open-meteo.com/v1/ensemble?' + om + '&hourly=cloud_cover&models=ecmwf_ifs025,icon_seamless', 'json', 45000)),
   safe(get('https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json')),
   safe(get('https://services.swpc.noaa.gov/json/ovation_aurora_latest.json', 'json', 45000)),
   safe(get('https://services.swpc.noaa.gov/products/summary/solar-wind-mag-field.json')),
@@ -59,7 +82,7 @@ if (rmap && rmap.data) {
   rmap.data.forEach(tr => (tr.customdata || []).forEach(c => {
     const lat = parseFloat(c[4]), lon = parseFloat(c[5]);
     if (!isFinite(lat) || /no data/i.test(c[0])) return;
-    fmi.push({ label: c[0], r: Math.round(c[3]), name: c[6], km: R.haversineKm(R.BASES[base], { lat, lon }) });
+    fmi.push({ label: c[0], r: Math.round(c[3]), name: c[6], km: R.haversineKm(B, { lat, lon }) });
   }));
   fmi = fmi.sort((a, b) => a.km - b.km).filter((s, i, arr) => arr.findIndex(x => x.name === s.name) === i).slice(0, 2);
 }
@@ -71,43 +94,82 @@ const stations = obsXml ? R.parseFmiObs(obsXml) : [];
 const obs = locs.map(l => R.nearestObs(stations, l.lat, l.lon, 40));
 const bz = mag && mag[0] && now - Date.parse(mag[0].time_tag) < 90 * 60e3 ? +mag[0].bz_gsm : null;
 const kpNow = R.parseKpNow(k1m);
-const h0 = Math.floor(now / R.HOUR) * R.HOUR;
-/* Nur laufende und nächste Stunde: Weiter reicht die Vorwarnung des Sonnenwind-Satelliten nicht */
-const win = { start: h0, end: h0 + R.HOUR, label: 'jetzt und nächste Stunde' };
-const results = R.evaluate({ locs, det: det ? [].concat(det) : null, ens: ens ? [].concat(ens) : null, kp: R.parseKp(kpRaw), ov: ovRaw ? R.reduceOvation(ovRaw) : null, bz, obs, kpNow, actNow, now, win });
-const rec = R.recommend(results);
-if (!rec) { console.log('Keine Bewertung möglich.'); process.exit(0); }
-const target = rec.verdict === 'fahren' ? rec.best : rec.home;
-const fmiActive = fmi.find(s => /medium|high/i.test(s.label));
-const fmiHigh = fmi.find(s => /high/i.test(s.label));
+const kp = R.parseKp(kpRaw);
+const ov = ovRaw ? R.reduceOvation(ovRaw) : null;
+const DET = det ? [].concat(det) : null, ENS = ens ? [].concat(ens) : null;
+const run = (win, withMagnet) => R.evaluate({ locs, det: DET, ens: ENS, kp, ov, bz, obs, kpNow, actNow: withMagnet ? actNow : null, now, win });
 
-const pct = v => Math.round((v || 0) * 100) + ' %';
-const dark = rec.verdict !== 'hell';
-const byChance = target.chance != null && target.chance >= THRESHOLD;
-const byMagnet = !!fmiActive && (target.pClear || 0) >= 0.5;
-const trigger = dark && (byChance || byMagnet);
+/* Texte wie in der App */
+const pct = v => v == null ? '–' : v < 0.05 ? 'unter 5 %' : Math.round(v * 20) * 5 + ' %';
+const deg = v => v == null || !isFinite(v) ? '–' : (Math.round(v) < 0 ? '−' : '') + Math.abs(Math.round(v)) + ' °C';
+const hh = t => String(R.local(t).h).padStart(2, '0');
+const where = l => l.name + ' (' + R.howText(l) + ')';
+const actionsFor = l => [].concat(l && l.min > 0 ? [{ action: 'view', label: 'Route', url: R.mapsUrl(l) }] : [], SITE ? [{ action: 'view', label: 'App öffnen', url: SITE }] : []);
 
-const where = target.loc.min === 0 ? target.loc.name + ' (vor der Tür)' : target.loc.name + ' (' + target.loc.min + ' Min. ' + (target.loc.how === 'Auto' ? 'mit dem Auto' : target.loc.how) + ')';
-const fmiTxt = fmi.length ? 'FMI-Magnetometer: ' + fmi.map(s => s.name + ' ' + ({ 'No activity': 'ruhig', 'Medium activity': 'aktiv', 'High activity': 'stark aktiv' }[s.label] || s.label) + ' (R ' + s.r + ')').join(', ') + '.' : '';
-const message = 'Chance ' + pct(target.chance) + ' bei ' + where + '. Himmel klar ' + pct(target.pClear) + ', Polarlicht aktiv ' + pct(target.pAur) + '. ' + fmiTxt;
-const title = fmiHigh ? 'Starkes Polarlicht gemessen, jetzt raus!' : byMagnet ? 'Magnetometer schlagen aus, jetzt raus!' : 'Gute Polarlicht-Chance, jetzt raus!';
-
-console.log(new Date(now).toISOString(), '| Basis', base, '| Urteil', rec.verdict, '| Ziel', target.loc.name, pct(target.chance), '| klar', pct(target.pClear), '| aktiv', pct(target.pAur), '| Bz', bz, '| Kp gemessen', kpNow && kpNow.kp.toFixed(2), '| FMI', JSON.stringify(fmi.map(s => [s.name, s.label, s.r])), 'P', actNow && actNow.p.toFixed(2), '| Wetterstationen', stations.length, '| Beobachtung am Ziel', JSON.stringify(obs[locs.indexOf(target.loc)]));
-console.log(trigger ? 'AUSLÖSEN: ' + title + ' ' + message : 'Kein Alarm (dunkel: ' + dark + ', Chance ≥ ' + THRESHOLD + ': ' + byChance + ', Magnetometer aktiv und klar: ' + byMagnet + ')');
-if (!trigger) process.exit(0);
-if (env.DRY_RUN) { console.log('DRY_RUN: nichts gesendet.'); process.exit(0); }
-if (!env.NTFY_TOPIC) { console.log('NTFY_TOPIC fehlt, nichts gesendet.'); process.exit(1); }
-
-/* Nicht öfter als alle 90 Minuten wecken */
-if (!env.FORCE) {
-  const recent = await safe(get(NTFY + '/' + encodeURIComponent(env.NTFY_TOPIC) + '/json?poll=1&since=90m', 'text'));
-  if (recent && recent.split('\n').some(l => { try { const j = JSON.parse(l); return j.event === 'message' && (j.tags || []).includes('polarlicht'); } catch (e) { return false; } })) {
-    console.log('In den letzten 90 Minuten wurde schon geweckt, diesmal nicht.'); process.exit(0);
+/* ---------- 1. Abend-Briefing ---------- */
+async function briefing() {
+  const due = env.TEST_BRIEFING || (env.BRIEFING !== '0' && L.h >= 17 && L.h < 19);
+  if (!due) return;
+  if (!env.TEST_BRIEFING && !env.DRY_RUN) {
+    const recent = await recentMessages('12h');
+    if (recent && recent.some(j => (j.tags || []).includes('briefing'))) { console.log('Briefing heute schon geschickt.'); return; }
   }
+  const nightRec = k => { const win = R.clampWindow(R.windowFor('nacht', now, k), base); const res = run(win, false); return { win, res, rec: R.recommend(res) }; };
+  const n0 = nightRec(0), n1 = nightRec(1);
+  const rec = n0.rec;
+  if (!rec || rec.verdict === 'hell') { console.log('Briefing: keine Bewertung möglich.'); return; }
+  const t = rec.target, lv = R.level(t.chance), go = lv.key === 'gut' || lv.key === 'mittel';
+  const span = R.goodSpan(t);
+  const title = lv.key === 'nein' ? 'Heute Nacht lohnt sich kaum (' + pct(t.chance) + ')' : 'Heute Nacht: ' + lv.word + ' (' + pct(t.chance) + ')';
+  const lines = [];
+  if (go) {
+    lines.push('Ziel: ' + where(t.loc) + '.');
+    if (t.best) lines.push('Am besten ' + hh(t.best.t) + ' Uhr' + (span && span.to - span.from > R.HOUR ? ', gut von ' + hh(span.from) + ' bis ' + hh(span.to) + ' Uhr' : '') + '.');
+  } else lines.push((lv.key === 'klein' ? 'Ein Blick nach Norden lohnt, wenn ihr ohnehin wach seid. ' : '') + 'Bester Spot: ' + t.loc.name + (t.best ? ', ' + hh(t.best.t) + ' Uhr' : '') + '.');
+  if (rec.far) lines.push('In der Nähe höchstens ' + pct(rec.near.chance) + ' (' + rec.near.loc.name + '), deshalb die längere Fahrt.');
+  lines.push('Himmel ' + R.skyWord(t.pClear) + ' (' + pct(t.pClear) + '), Polarlicht ' + R.auroraWord(t.pAur) + '.');
+  if (t.feelsMin != null) lines.push('Gefühlt bis ' + deg(t.feelsMin) + '.');
+  const mo = t.best && t.best.moon; if (mo && mo.light >= 0.3) lines.push('Mond: ' + R.moonWord(mo).text + '.');
+  const r1 = n1.rec && n1.rec.target;
+  if (r1 && r1.chance != null && r1.chance - (t.chance || 0) >= 0.15) lines.push('Morgen Nacht besser: ' + pct(r1.chance) + '.');
+  if (n0.win.until != null) lines.push('Gerechnet bis ' + n0.win.until + ' Uhr (Abfahrt).');
+  lines.push('Der Wecker meldet sich ab ' + pct(THRESHOLD) + '.');
+  const message = lines.join(' ');
+  console.log('BRIEFING:', title, '|', message);
+  await send({ title, message, priority: 3, tags: ['crescent_moon', 'briefing'], actions: actionsFor(go ? t.loc : null) });
 }
-const res = await fetch(NTFY, {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ topic: env.NTFY_TOPIC, title, message, priority: 5, tags: ['milky_way', 'polarlicht'], click: env.SITE_URL || undefined })
-});
-console.log('ntfy:', res.status);
+
+/* ---------- 2. Alarm ---------- */
+async function alarm() {
+  const h0 = Math.floor(now / R.HOUR) * R.HOUR;
+  /* Nur laufende und nächste Stunde: Weiter reicht die Vorwarnung des Sonnenwind-Satelliten nicht. Keine Fernziele. */
+  const results = run({ start: h0, end: h0 + R.HOUR, label: 'jetzt und nächste Stunde' }, true);
+  const rec = R.recommend(results, { near: true });
+  if (!rec) { console.log('Alarm: keine Bewertung möglich.'); return; }
+  const target = rec.target;
+  const fmiActive = fmi.find(s => /medium|high/i.test(s.label));
+  const fmiHigh = fmi.find(s => /high/i.test(s.label));
+  const dark = rec.verdict !== 'hell';
+  const byChance = target.chance != null && target.chance >= THRESHOLD;
+  const byMagnet = !!fmiActive && (target.pClear || 0) >= 0.5;
+  const trigger = dark && (byChance || byMagnet);
+  const fmiTxt = fmi.length ? 'FMI-Magnetometer: ' + fmi.map(s => s.name + ' ' + ({ 'No activity': 'ruhig', 'Medium activity': 'aktiv', 'High activity': 'stark aktiv' }[s.label] || s.label) + ' (R ' + s.r + ')').join(', ') + '.' : '';
+  const message = where(target.loc) + '. Chance ' + pct(target.chance) + ', Himmel ' + R.skyWord(target.pClear) + ' (' + pct(target.pClear) + '), Polarlicht ' + R.auroraWord(target.pAur) + '. ' + (target.tFirst != null ? 'Draußen ' + deg(target.tFirst) + '. ' : '') + fmiTxt;
+  const title = fmiHigh ? 'Starkes Polarlicht gemessen, jetzt raus!' : byMagnet ? 'Magnetometer schlagen aus, jetzt raus!' : 'Gute Polarlicht-Chance, jetzt raus!';
+  console.log(new Date(now).toISOString(), '| Basis', base, '| Urteil', rec.verdict, '| Ziel', target.loc.name, pct(target.chance), '| klar', pct(target.pClear), '| aktiv', pct(target.pAur), '| Bz', bz, '| Kp gemessen', kpNow && kpNow.kp.toFixed(2), '| FMI', JSON.stringify(fmi.map(s => [s.name, s.label, s.r])), 'P', actNow && actNow.p.toFixed(2), '| Wetterstationen', stations.length, '| Beobachtung am Ziel', JSON.stringify(obs[locs.findIndex(l => l.id === target.loc.id)]));
+  if (!trigger) { console.log('Kein Alarm (dunkel: ' + dark + ', Chance ≥ ' + THRESHOLD + ': ' + byChance + ', Magnetometer aktiv und klar: ' + byMagnet + ')'); return; }
+  console.log('AUSLÖSEN: ' + title + ' ' + message);
+  /* Nicht öfter als alle 90 Minuten wecken. Ausnahme: Es wird jetzt stark und das wurde noch nicht gemeldet. */
+  if (!env.FORCE && !env.DRY_RUN) {
+    const recent = await recentMessages('90m');
+    const alarms = (recent || []).filter(j => (j.tags || []).includes('polarlicht'));
+    if (alarms.length) {
+      if (fmiHigh && !alarms.some(j => (j.tags || []).includes('stark'))) console.log('Schon geweckt, aber jetzt stark: noch einmal.');
+      else { console.log('In den letzten 90 Minuten wurde schon geweckt, diesmal nicht.'); return; }
+    }
+  }
+  await send({ title, message, priority: 5, tags: ['milky_way', 'polarlicht'].concat(fmiHigh ? ['stark'] : []), actions: actionsFor(target.loc) });
+}
+
+await briefing();
+await alarm();
