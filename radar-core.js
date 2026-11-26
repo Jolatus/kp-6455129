@@ -166,11 +166,23 @@
     let dh = Math.abs(l.h + l.min / 60 - 23.5); if (dh > 12) dh = 24 - dh;
     return 0.65 + 0.35 * Math.exp(-((dh / 3.2) ** 2));
   }
+  /* NOAA-Sturmstufe aus Kp: G1 ab Kp 5 bis G5 bei Kp 9 */
+  const gScale = kp => !isFinite(kp) ? 0 : kp >= 9 ? 5 : kp >= 8 ? 4 : kp >= 7 ? 3 : kp >= 6 ? 2 : kp >= 5 ? 1 : 0;
+  const gWord = g => ['', 'klein', 'mäßig', 'stark', 'schwer', 'extrem'][g] || '';
+  const gOf = s => { const m = /^G(\d)$/.exec(String(s || '')); return m ? +m[1] : null; };
+  /* kind: observed (gemessen), estimated (laufender Tag, auch künftige Blöcke!) oder predicted.
+     g: Sturmstufe, wenn vorhanden die von NOAA selbst */
   function parseKp(rows) {
     const out = [];
     (rows || []).forEach((r, i) => {
-      if (Array.isArray(r)) { if (i === 0) return; out.push({ t: Date.parse(r[0].replace(' ', 'T') + 'Z'), kp: +r[1], kind: r[2] }); }
-      else if (r && r.time_tag) out.push({ t: Date.parse(r.time_tag + (/Z$/.test(r.time_tag) ? '' : 'Z')), kp: +r.kp, kind: r.observed });
+      if (Array.isArray(r)) {
+        if (i === 0) return;
+        const k = +r[1], g = gOf(r[3]);
+        out.push({ t: Date.parse(r[0].replace(' ', 'T') + 'Z'), kp: k, kind: r[2], g: g != null ? g : gScale(k) });
+      } else if (r && r.time_tag) {
+        const k = +r.kp;
+        out.push({ t: Date.parse(r.time_tag + (/Z$/.test(r.time_tag) ? '' : 'Z')), kp: k, kind: r.observed, g: 'noaa_scale' in r ? (gOf(r.noaa_scale) || 0) : gScale(k) });
+      }
     });
     return out.filter(r => isFinite(r.t) && isFinite(r.kp)).sort((a, b) => a.t - b.t);
   }
@@ -195,8 +207,42 @@
     return best;
   }
   const ovationFloor = v => v >= 35 ? 0.92 : v >= 20 ? 0.8 : v >= 12 ? 0.65 : 0;
-  /* Stark südlicher Sonnenwind (Bz) kündigt Aktivität in den nächsten 1–2 Stunden an */
-  const bzBoost = bz => bz == null ? 0 : bz <= -10 ? 1.5 : bz <= -5 ? 0.7 : 0;
+  /* Südlicher Sonnenwind kündigt Aktivität in den nächsten 1–2 Stunden an. Entscheidend ist Bz mal Geschwindigkeit
+     (elektrisches Feld in mV/m): Bz −5 nT bei 400 km/s ergibt 2, Bz −10 nT ergibt 4. Ohne Geschwindigkeit gilt 400 km/s. */
+  function swBoost(bz, v) {
+    if (bz == null || !isFinite(bz) || bz >= 0) return 0;
+    const ey = -bz * (v != null && isFinite(v) && v > 0 ? v : 400) / 1000;
+    return ey >= 4 ? 1.5 : ey >= 2 ? 0.7 : 0;
+  }
+  /* NOAA-Echtzeit-Sonnenwind (json/rtsw, Minutenwerte): Mittel der letzten 30 Minuten.
+     Je Minute zählt die aktive Sonde, hat sie eine Lücke, die Ersatzsonde. Ein einzelner Minutenwert springt zu stark.
+     Null, wenn nichts da oder älter als 90 Minuten. */
+  function solarWind(mag, wind, now) {
+    const series = (rows, key) => {
+      const byT = new Map();
+      (rows || []).forEach(r => {
+        if (!r || r[key] == null || !isFinite(r[key]) || !r.time_tag) return;
+        const t = Date.parse(r.time_tag + (/Z$/.test(r.time_tag) ? '' : 'Z'));
+        if (!isFinite(t)) return;
+        const prev = byT.get(t), act = r.active !== false;
+        if (!prev || (act && !prev.act)) byT.set(t, { t, v: +r[key], act });
+      });
+      const v = [...byT.values()];
+      if (!v.length) return null;
+      let t1 = -Infinity; v.forEach(r => { if (r.t > t1) t1 = r.t; });
+      if (now - t1 > 90 * 60e3) return null;
+      const w = v.filter(r => r.t > t1 - 30 * 60e3);
+      return { mean: w.reduce((a, b) => a + b.v, 0) / w.length, t: t1, n: w.length };
+    };
+    const b = series(mag, 'bz_gsm'); if (!b) return null;
+    const s = series(wind, 'proton_speed');
+    return { bz: Math.round(b.mean * 10) / 10, v: s ? Math.round(s.mean) : null, t: b.t, n: b.n };
+  }
+  const quartiles = a => {
+    if (!a.length) return null;
+    const s = a.slice().sort((x, y) => x - y), q = p => Math.round(s[Math.round(p * (s.length - 1))]);
+    return [q(0.25), q(0.5), q(0.75)];
+  };
 
   /* ---------- Wolken ---------- */
   const CLEAR_TOTAL = 40;                           /* Ensemble: unter 40 % Gesamtbewölkung gilt als klar genug */
@@ -227,16 +273,17 @@
         /* Gemessener Kp schlägt die Prognose, solange er frisch ist */
         /* Innerhalb der L1-Vorwarnzeit (ca. 1 Stunde) zählt fast nur, was gerade gemessen wird */
         if (o.kpNow && now - o.kpNow.t < 30 * 60e3 && lead >= 0 && lead <= 2) { const w = [0.9, 0.7, 0.3][lead]; k = w * o.kpNow.kp + (1 - w) * k; }
-        if (t < now + 2 * HOUR) k += bzBoost(bz);
+        if (t < now + 2 * HOUR) k += swBoost(bz, o.v);
         kpMax = Math.max(kpMax, k);
         let pa = kpToP(k, loc.lat) * nightFactor(t + 30 * 60e3);
         let ovv = null;
         if (ov && isFinite(ov.valid) && t <= ov.valid + 30 * 60e3) { ovv = ovationNear(ov, loc.lat, loc.lon); pa = Math.max(pa, ovationFloor(ovv)); }
         /* Lokale Magnetometer (FMI-R-Index) sind die beste Aussage über „jetzt“ */
         if (o.actNow && now - o.actNow.t < 20 * 60e3 && lead >= 0 && lead <= 1) { const w = [0.7, 0.35][lead]; pa = (1 - w) * pa + w * o.actNow.p; }
-        let dc = null, eff = null, temp = null, feels = null, wind = null, snow = null, gust = null;
+        let dc = null, eff = null, temp = null, feels = null, wind = null, snow = null, gust = null, lo = null, mi = null, hi = null;
         if (di && di.has(t)) {
-          const j = di.get(t); eff = effCloud(D.cloud_cover_low[j], D.cloud_cover_mid[j], D.cloud_cover_high[j]); dc = detClear(eff);
+          const j = di.get(t); lo = D.cloud_cover_low[j]; mi = D.cloud_cover_mid[j]; hi = D.cloud_cover_high[j];
+          eff = effCloud(lo, mi, hi); dc = detClear(eff);
           if (D.temperature_2m) temp = D.temperature_2m[j];
           if (D.apparent_temperature) feels = D.apparent_temperature[j];
           if (D.wind_speed_10m) wind = D.wind_speed_10m[j];
@@ -245,10 +292,13 @@
         }
         /* Beobachtung der nächsten Wetterstation zieht die erste und zweite Stunde Richtung Wirklichkeit */
         const w = ob && now - ob.t < 75 * 60e3 ? (t <= now && now < t + HOUR ? 0.5 : t > now && t <= now + HOUR ? 0.25 : 0) : 0;
-        let members = null, ec = null;
+        let members = null, ec = null, eq = null;
         if (ei && ei.has(t)) {
           const j = ei.get(t);
-          members = memberKeys.map(key => { const v = E[key][j]; return v == null ? null : v < CLEAR_TOTAL ? 1 : 0; }).filter(v => v != null);
+          const raw = memberKeys.map(key => E[key][j]).filter(v => v != null && isFinite(v));
+          /* eq: Gesamtbewölkung aller Läufe als unteres Viertel, Mitte, oberes Viertel (für das Wolkendiagramm) */
+          eq = quartiles(raw);
+          members = raw.map(v => v < CLEAR_TOTAL ? 1 : 0);
           if (w) members = members.map(m => (1 - w) * m + w * ob.clear);
           ec = members.length ? members.reduce((a, b) => a + b, 0) / members.length : null;
         }
@@ -256,7 +306,7 @@
         const pcRaw = ec != null && dc != null ? 0.6 * ec + 0.4 * dc : ec != null ? ec : dc;
         const pc = pcRaw == null ? null : pcRaw * RELIABLE;
         const moon = moonState(t + 30 * 60e3, loc.lat, loc.lon), mf = moonFactor(moon.light, pa);
-        return { t, dark, kp: k, pa, ov: ovv, eff, dc, ec, members, pc, obsW: w, temp, feels, wind, snow, gust, moon, mf, c: pc == null ? null : pc * pa * dark * mf };
+        return { t, dark, kp: k, pa, ov: ovv, eff, lo, mi, hi, eq, dc, ec, members, pc, obsW: w, temp, feels, wind, snow, gust, moon, mf, c: pc == null ? null : pc * pa * dark * mf };
       });
       const fEff = f0 + (1 - f0) * Math.max(0, Math.min(1, (kpMax - 3) / 3));
       const darkRows = rows.filter(r => r.dark > 0);
@@ -484,7 +534,9 @@
       try {
         const j = JSON.parse(l); if (!j || j.event !== 'message') return;
         const m = JSON.parse(j.message); if (!m || m.v !== 1 || !isFinite(m.t)) return;
-        if (!best || m.t > best.t) best = { t: m.t, base: m.base, p: isFinite(m.p) ? m.p : null, fmi: (m.fmi || []).map(x => ({ name: x[0], label: x[1], r: x[2], km: x[3] })) };
+        /* sw: geglätteter Sonnenwind [Bz, Geschwindigkeit, Zeit] (seit v9, ältere Meldungen haben ihn nicht) */
+        const sw = Array.isArray(m.sw) && Number.isFinite(m.sw[0]) && Number.isFinite(m.sw[2]) ? { bz: m.sw[0], v: Number.isFinite(m.sw[1]) ? m.sw[1] : null, t: m.sw[2] } : null;
+        if (!best || m.t > best.t) best = { t: m.t, base: m.base, p: isFinite(m.p) ? m.p : null, fmi: (m.fmi || []).map(x => ({ name: x[0], label: x[1], r: x[2], km: x[3] })), sw };
       } catch (e) { /* keine Statusmeldung */ }
     });
     return best;
@@ -507,5 +559,5 @@
     return { rationale: r ? r[1].replace(/\s+/g, ' ').trim() : '', issued: issued.trim() };
   }
 
-  root.Radar = { TZ, HOUR, BASES, SPOTS, TRIP, local, localTime, baseForToday, windowFor, clampWindow, dayState, nightFactor, howText, mapsUrl, goodSpan, sunAlt, darkness, kpToP, parseKp, kpAt, reduceOvation, ovationNear, evaluate, recommend, haversineKm, effCloud, detClear, parseFmiObs, nearestObs, obsClear, parse27, parse3day, parseKpNow, RINDEX_THRESH, rIndexToP, level, skyWord, auroraWord, coldAdvice, moonState, moonFactor, moonWord, parseFmiSeries, hindsight, tripPlan, roadWorst, corridor, parseStatus, fmiWord };
+  root.Radar = { TZ, HOUR, BASES, SPOTS, TRIP, local, localTime, baseForToday, windowFor, clampWindow, dayState, nightFactor, howText, mapsUrl, goodSpan, sunAlt, darkness, kpToP, parseKp, kpAt, gScale, gWord, swBoost, solarWind, reduceOvation, ovationNear, evaluate, recommend, haversineKm, effCloud, detClear, parseFmiObs, nearestObs, obsClear, parse27, parse3day, parseKpNow, RINDEX_THRESH, rIndexToP, level, skyWord, auroraWord, coldAdvice, moonState, moonFactor, moonWord, parseFmiSeries, hindsight, tripPlan, roadWorst, corridor, parseStatus, fmiWord };
 })(typeof window !== 'undefined' ? window : globalThis);

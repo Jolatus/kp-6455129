@@ -2,9 +2,9 @@
    Mit Netz kommt die Seite immer frisch vom Server, ohne Netz aus dem Speicher.
    Kartenkacheln kommen aus dem Kartenpaket, das die App auf Knopfdruck speichert (pr-tiles-v1).
    Wetterdaten werden nicht hier zwischengespeichert, das macht die App selbst. */
-const CACHE = 'polarlicht-radar-v9';
+const CACHE = 'polarlicht-radar-v10';
 const TILES = 'pr-tiles-v1';
-const SHELL = ['./', './index.html', './radar-core.js?v=8', './manifest.webmanifest', './icon-512.png'];
+const SHELL = ['./', './index.html', './radar-core.js?v=9', './manifest.webmanifest', './icon-512.png'];
 /* Kartenbibliothek von cdnjs, damit die Karte auch ohne Netz startet */
 const LIBS = ['https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'];
 
