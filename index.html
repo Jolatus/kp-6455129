@@ -248,6 +248,24 @@ details.more .inner { display: grid; gap: 0.8rem; }
 .links { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
 .links a { display: block; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 0.55rem 0.75rem; text-decoration: none; color: var(--ink); }
 .links small { display: block; color: var(--muted); font-size: 0.78rem; }
+.trip { display: grid; grid-template-columns: auto 1fr; gap: 0.15rem 0.6rem; align-items: baseline; font-size: 0.86rem; padding: 0.55rem 0.7rem; border-radius: 10px; background: color-mix(in srgb, var(--warn) 12%, var(--raise)); }
+.trip > b { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--warn); }
+.trip span b { color: var(--ink); }
+.prep { background: color-mix(in srgb, var(--warn) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--warn) 45%, var(--line)); border-radius: 14px; padding: 0.6rem 0.8rem; }
+.prep > summary { cursor: pointer; font-weight: 700; font-size: 0.92rem; }
+.prep ul { list-style: none; margin: 0.6rem 0 0; padding: 0; display: grid; gap: 0.6rem; }
+.prep li { display: grid; grid-template-columns: 1.4rem 1fr; gap: 0.5rem; font-size: 0.88rem; align-items: start; }
+.prep li .ck { font-weight: 800; color: var(--muted); text-align: center; }
+.prep li.ok .ck { color: var(--lv-gut); }
+.prep li small { display: block; color: var(--muted); font-size: 0.78rem; }
+.prep input[type=checkbox] { width: 1.1rem; height: 1.1rem; accent-color: var(--chance); margin: 0.15rem auto 0; }
+.prep .go { margin-top: 0.35rem; font-size: 0.84rem; padding: 0.35rem 0.7rem; }
+.livecam .camwrap { display: grid; gap: 0.5rem; justify-items: start; }
+.livecam img { width: 100%; max-width: 440px; border-radius: 12px; border: 1px solid var(--line); background: #000; aspect-ratio: 1; object-fit: contain; }
+.red .livecam img { filter: grayscale(1) sepia(1) hue-rotate(-50deg) saturate(4) brightness(0.6); }
+.ntfy { display: grid; gap: 0.35rem; border-top: 1px solid var(--line); padding-top: 0.6rem; }
+.ntfy .row { display: flex; gap: 0.4rem; }
+.ntfy input { flex: 1; min-width: 0; background: var(--raise); border: 1px solid var(--line); border-radius: 8px; padding: 0.4rem 0.55rem; color: var(--ink); font: inherit; }
 .foot { font-size: 0.74rem; color: var(--muted); display: grid; gap: 0.3rem; }
 </style>
 </head>
@@ -266,10 +284,23 @@ details.more .inner { display: grid; gap: 0.8rem; }
 
   <div class="seg" role="group" aria-label="Wo seid ihr?" id="seg-base"></div>
   <p class="where" id="where">Wo seid ihr gerade? Während der Reise ist die Unterkunft automatisch gewählt.</p>
+  <details class="prep" id="prep" hidden>
+    <summary id="prep-sum">Vor der Reise</summary>
+    <ul id="prep-list"></ul>
+  </details>
 
   <section class="ans" id="ans" aria-live="polite">
     <div class="band"><b>Lädt …</b><span></span></div>
     <div class="ans-body"><p class="lead">Wolken, Polarlicht, Dunkelheit und Kälte für alle Spots rund um eure Unterkunft.</p></div>
+  </section>
+
+  <section class="block livecam" id="livecam" aria-labelledby="h-livecam" hidden>
+    <h2 class="h" id="h-livecam">Live-Kamera: Ist gerade etwas am Himmel?</h2>
+    <div class="camwrap" id="livecam-box">
+      <img id="livecam-img" alt="Aktuelles Bild der Himmelskamera in Kiruna" hidden>
+      <button type="button" class="go ghost" id="livecam-load">Bild aus Kiruna laden (ca. 170 KB)</button>
+    </div>
+    <p class="small" id="livecam-note"></p>
   </section>
 
   <section class="block" aria-labelledby="h-nights">
@@ -323,6 +354,11 @@ details.more .inner { display: grid; gap: 0.8rem; }
           <option value="0.65">65 %</option>
         </select>
       </label>
+      <div class="ntfy">
+        <label for="w-topic">ntfy-Thema, damit die App die Magnetometer-Werte zeigt</label>
+        <div class="row"><input id="w-topic" type="password" autocomplete="off" spellcheck="false" placeholder="Themenname aus der ntfy-App"><button type="button" class="go ghost" id="w-topic-save">Speichern</button></div>
+        <p class="small" id="w-topic-state"></p>
+      </div>
       <div class="actions">
         <button type="button" class="go" id="w-start">Wache starten</button>
         <button type="button" class="go ghost" id="w-test">Probealarm</button>
@@ -383,6 +419,9 @@ details.more .inner { display: grid; gap: 0.8rem; }
         <li><b>Polarlicht aktiv:</b> Für später die Kp-Vorhersage von NOAA, umgerechnet auf die Breite des Spots. Für die laufende und nächste Stunde vor allem der gemessene Kp der letzten 30 Minuten, dazu Sonnenwind und OVATION.</li>
         <li><b>Tageszeit:</b> In Lappland ist Polarlicht um 23–24 Uhr am häufigsten. Der Kp-Wert zählt dann voll, am frühen Abend zu 65 %. Deshalb liegt die beste Stunde meist zwischen 21 und 02 Uhr.</li>
         <li><b>Hingehen oder bleiben:</b> Ein anderer Spot wird empfohlen, wenn er um 3 Punkte plus etwa 1 Punkt je 10 Minuten Weg besser ist als der Platz vor der Tür.</li>
+        <li><b>Unterwegs:</b> Bei Wegen ab 30 Minuten rechnet die App aus, wann ihr losfahren müsst und wann ihr zurück seid. Dazu kommen Schneefall und Böen aus MET Nordic und der Straßenzustand aus der Straßenwetter-Prognose von Fintraffic. „Glatt“ ist im Lapplandwinter normal, gewarnt wird bei „sehr schlecht“.</li>
+        <li><b>Magnetometer:</b> Der Push-Wecker liest den R-Index des finnischen Wetterdienstes und schickt ihn alle 10 Minuten still an das Thema „euer Thema-status“. Die App holt ihn dort ab und rechnet ihn für die laufende Stunde ein, wie der Wecker.</li>
+        <li><b>Vorhersage im Vergleich:</b> Die App merkt sich jeden Abend bis 19 Uhr ihre Vorhersage und vergleicht sie im Rückblick mit der Messung der Wetterstation.</li>
         <li><b>Weiter weg:</b> Fernziele bis etwa 1,5 Stunden Fahrt (Fahrzeit aus OpenStreetMap-Routing plus 10 % für Winterstraßen). Sie kommen nur in Frage, wenn sie auch die beste Wahl in der Nähe nach derselben Regel schlagen. Der Wecker schaut nur auf die Nähe.</li>
         <li><b>Dunkel:</b> Sonnenstand je Spot und Stunde. Unter −10° zählt voll, zwischen −10° und −6° halb.</li>
         <li><b>Spot:</b> Nordblick und Dunkelheit aus eurer Reiseseite, Faktor 0,6 bis 1,0.</li>
@@ -401,7 +440,7 @@ details.more .inner { display: grid; gap: 0.8rem; }
   </section>
 
   <footer class="foot">
-    <p>Wetterdaten: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0) mit Modellen von MET Norway, ECMWF und DWD. Beobachtungen: <a href="https://en.ilmatieteenlaitos.fi/open-data" target="_blank" rel="noopener">Finnischer Wetterdienst (FMI)</a>, CC BY 4.0. Satellit: <a href="https://view.eumetsat.int/" target="_blank" rel="noopener">EUMETSAT</a>. Polarlicht, Kp und Sonnenwind: <a href="https://www.swpc.noaa.gov/" target="_blank" rel="noopener">NOAA SWPC</a>. Karte: © OpenStreetMap-Mitwirkende.</p>
+    <p>Wetterdaten: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0) mit Modellen von MET Norway, ECMWF und DWD. Beobachtungen: <a href="https://en.ilmatieteenlaitos.fi/open-data" target="_blank" rel="noopener">Finnischer Wetterdienst (FMI)</a>, CC BY 4.0. Satellit: <a href="https://view.eumetsat.int/" target="_blank" rel="noopener">EUMETSAT</a>. Polarlicht, Kp und Sonnenwind: <a href="https://www.swpc.noaa.gov/" target="_blank" rel="noopener">NOAA SWPC</a>. Straßenwetter: <a href="https://www.digitraffic.fi/" target="_blank" rel="noopener">Fintraffic / Digitraffic</a>, CC BY 4.0. Himmelskamera: <a href="https://www.irf.se/alis/allsky/krn/" target="_blank" rel="noopener">IRF Kiruna</a>. Fahrzeiten: OSRM auf OpenStreetMap-Daten. Karte: © OpenStreetMap-Mitwirkende.</p>
     <p>Alle Zeiten sind finnische Ortszeit. Nur in Parkbuchten halten, nie am Straßenrand.</p>
   </footer>
 </main>
@@ -418,7 +457,7 @@ details.more .inner { display: grid; gap: 0.8rem; }
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="radar-core.js?v=6"></script>
+<script src="radar-core.js?v=7"></script>
 <script>
 (function () {
   'use strict';
@@ -537,7 +576,7 @@ details.more .inner { display: grid; gap: 0.8rem; }
     /* Live-Werte (Kp der letzten Minuten, Sonnenwind, Stationen) nur nachts, OVATION (900 KB) nur bei Dunkelheit */
     const live = !ds.day, none = Promise.resolve(null);
     const jobs = [
-      getData('https://api.open-meteo.com/v1/forecast?' + om + '&hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high,temperature_2m,apparent_temperature,wind_speed_10m&models=metno_seamless'),
+      getData('https://api.open-meteo.com/v1/forecast?' + om + '&hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high,temperature_2m,apparent_temperature,wind_speed_10m,snowfall,wind_gusts_10m&models=metno_seamless'),
       getData('https://ensemble-api.open-meteo.com/v1/ensemble?' + om + '&hourly=cloud_cover&models=ecmwf_ifs025,icon_seamless', 'json', 35000),
       getData('https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json'),
       ds.darkNow ? getData('https://services.swpc.noaa.gov/json/ovation_aurora_latest.json', 'json', 40000) : none,
@@ -547,10 +586,12 @@ details.more .inner { display: grid; gap: 0.8rem; }
       live ? getData('https://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFeature&storedquery_id=fmi::observations::weather::simple&bbox=20,66,30,70.2&parameters=n_man&starttime=' + iso(now - 40 * 60e3) + '&endtime=' + iso(now), 'text') : none,
       slow ? getData('https://services.swpc.noaa.gov/text/27-day-outlook.txt', 'text') : none,
       slow ? getData('https://services.swpc.noaa.gov/text/3-day-forecast.txt', 'text') : none,
-      needHist ? getData(histUrl(now), 'text', 30000) : none
+      needHist ? getData(histUrl(now), 'text', 30000) : none,
+      /* Magnetometer-Status vom Push-Wecker, nur nachts und nur mit eingetragenem Thema */
+      live && store.get('topic') ? getData('https://ntfy.sh/' + encodeURIComponent(store.get('topic') + '-status') + '/json?poll=1&since=40m', 'text', 15000) : none
     ];
     const res = await Promise.allSettled(jobs);
-    const [det, ens, kp, ov, mag, spd, k1m, obs, o27, d3, hx] = res.map(r => r.status === 'fulfilled' ? r.value : null);
+    const [det, ens, kp, ov, mag, spd, k1m, obs, o27, d3, hx, stx] = res.map(r => r.status === 'fulfilled' ? r.value : null);
     const next0 = {};
     if (hx) next0.hist = { key: hKey, at: now, st: R.parseFmiSeries(hx).filter(s => s.v.n_man) };
     const errs = [], next = Object.assign({}, d, next0), ids = locs.map(l => l.id);
@@ -569,6 +610,7 @@ details.more .inner { display: grid; gap: 0.8rem; }
     if (obs) { next.obs = R.parseFmiObs(obs); next.obsAt = now; }
     if (o27) { next.out27 = R.parse27(o27); next.out27At = now; }
     if (d3) next.d3 = R.parse3day(d3);
+    if (stx != null) { const st = R.parseStatus(stx); if (st) next.status = st; next.statusAt = now; }
     if (det || ens || kp || ov) next.at = now;
     state.data = next; state.errors = errs; state.loading = false; $('btn-refresh').disabled = false;
     store.set('data3', next);
@@ -588,7 +630,9 @@ details.more .inner { display: grid; gap: 0.8rem; }
     const obs = d.obs && d.obsAt && now - d.obsAt < 75 * 60e3 ? locs.map(l => R.nearestObs(d.obs, l.lat, l.lon, 40)) : null;
     const results = R.evaluate({
       locs, det: okDet ? pickRows(d.det, d.detIds) : null, ens: okEns ? pickRows(d.ens, d.ensIds) : null, kp: d.kp || [], ov: d.ov,
-      bz: d.mag && now - d.mag.t < 90 * 60e3 ? d.mag.bz : null, kpNow: d.kpNow, obs, now, win
+      bz: d.mag && now - d.mag.t < 90 * 60e3 ? d.mag.bz : null, kpNow: d.kpNow, obs, now, win,
+      /* Magnetometer-Status vom Wecker (gleiche Unterkunft, höchstens 20 Minuten alt) */
+      actNow: d.status && d.status.base === state.base && d.status.p != null && now - d.status.t < 20 * 60e3 ? { p: d.status.p, t: d.status.t } : null
     });
     return { results, win, rec: R.recommend(results, opts), now };
   }
@@ -632,7 +676,35 @@ details.more .inner { display: grid; gap: 0.8rem; }
     if (d.mag && isFinite(d.mag.bz) && now - d.mag.t < 90 * 60e3) bits.push('Sonnenwind ' + (d.mag.bz <= -5 ? 'günstig' : d.mag.bz < 0 ? 'leicht günstig' : 'ungünstig'));
     const st = d.obs && d.obsAt && now - d.obsAt < 75 * 60e3 ? R.nearestObs(d.obs, r.loc.lat, r.loc.lon, 40) : null;
     if (st) bits.push('Station ' + Math.round(st.km) + ' km: ' + Math.round(st.n) + '/8 bewölkt');
+    if (d.status && now - d.status.t < 30 * 60e3 && d.status.fmi.length) bits.push('Magnetometer ' + d.status.fmi.map(f => f.name + ' ' + R.fmiWord(f.label)).join(', '));
     return bits.length ? '<div class="nowline"><b>Gerade jetzt</b><span>' + bits.join(' · ') + '</span></div>' : '';
+  }
+
+  /* Straßenzustand von Fintraffic für den Weg Unterkunft → Ziel (nur heute Nacht, 30 Minuten zwischengespeichert) */
+  function roadState(loc) {
+    const key = state.base + '>' + loc.id, rs = state.road, now = nowMs();
+    if (rs && rs.key === key && (rs.loading || now - rs.at < (rs.ok ? 30 : 10) * 60e3)) return rs.loading ? 'loading' : rs.ok ? R.roadWorst(rs.data, now, now + 8 * R.HOUR) : null;
+    const b = R.corridor(center(), loc), q = ['xMin', 'yMin', 'xMax', 'yMax'].map(k => k + '=' + b[k].toFixed(2)).join('&');
+    state.road = { key, at: now, loading: true };
+    getData('https://tie.digitraffic.fi/api/weather/v1/forecast-sections/forecasts?' + q, 'json', 20000)
+      .then(j => { state.road = { key, at: nowMs(), ok: true, data: j }; }, () => { state.road = { key, at: nowMs(), ok: false }; })
+      .then(() => { if (!state.loading) render(); });
+    return 'loading';
+  }
+  function tripHTML(r, rec, tonight) {
+    const home = rec && rec.home && rec.home !== r ? rec.home : null;
+    const plan = R.tripPlan(r, home); if (!plan) return '';
+    const now = nowMs(), lines = [];
+    if (tonight && plan.go <= now) lines.push('Jetzt losfahren, dann seid ihr ' + (plan.from <= now ? 'noch in der guten Zeit' : 'zur guten Zeit ab ' + hh(plan.from) + ' Uhr') + ' dort.');
+    else lines.push('Losfahren gegen <b>' + clock10(plan.go) + ' Uhr</b>, dann seid ihr zur guten Zeit (' + hh(plan.from) + '–' + hh(plan.to) + ' Uhr) dort.');
+    lines.push('Zurück gegen ' + clock10(plan.back) + ' Uhr.');
+    if (plan.snow >= 0.3) lines.push('Unterwegs Schneefall möglich (bis ' + num(plan.snow, 1) + ' cm pro Stunde).');
+    if (plan.gust >= 50) lines.push('Böen bis ' + Math.round(plan.gust) + ' km/h, Schneeverwehungen möglich.');
+    const rd = tonight && !dayNow().day ? roadState(r.loc) : null;
+    if (rd === 'loading') lines.push('Straßenzustand wird geladen …');
+    else if (rd) lines.push(rd.worst === 2 ? '<b>Straßen laut Fintraffic sehr schlecht.</b> Die Fahrt besser lassen.' : rd.worst === 1 ? 'Straßen laut Fintraffic glatt' + (rd.verySlippery ? ', stellenweise sehr glatt' : '') + ', wie meist im Lapplandwinter. Langsam fahren.' : 'Straßen laut Fintraffic normal.');
+    if (r.loc.far) lines.push('Vorher tanken, Handy laden, Decke und Thermoskanne ins Auto. Ohne Netz navigiert Google Maps nur mit Offline-Karte.');
+    return '<div class="trip"><b>Unterwegs</b><span>' + lines.join(' ') + '</span></div>';
   }
 
   function renderAnswer(c) {
@@ -661,6 +733,7 @@ details.more .inner { display: grid; gap: 0.8rem; }
       html += '<div class="fact"><span class="k">Kurz</span><span class="v">' + (lv.key === 'klein' ? 'Kleine Chance. Wenn ihr ohnehin wach seid: ein Blick nach Norden lohnt.' : 'Heute lohnt sich das Warten kaum. Polarlicht-Wecker an lassen und schlafen gehen.') + '<small>Bester Spot: ' + esc(r.loc.name) + (r.best ? ', ' + hh(r.best.t) + ' Uhr' : '') + '</small></span></div>';
     }
     html += '</div>';
+    if (go && r.loc.min >= 30) html += tripHTML(r, p.rec, tonight);
     html += '<div class="nums"><div class="num c"><b>' + pct(r.chance) + '</b><span>' + esc(lv.word) + ', Polarlicht zu sehen</span></div>' +
       '<div class="num t"><b>' + deg(tAt) + '</b><span>' + (fAt != null ? 'gefühlt ' + deg(fAt) : 'Temperatur') + (r.best ? ' um ' + hh(at.t) + ' Uhr' : '') + '</span></div></div>';
     const cls = (v, a, b) => v == null ? '' : v >= a ? 'ok' : v >= b ? 'mid' : 'bad';
@@ -716,14 +789,21 @@ details.more .inner { display: grid; gap: 0.8rem; }
       det.innerHTML = '<p class="small">' + (!P ? (state.loading ? 'Messwerte werden geladen …' : 'Keine Messwerte geladen. „Neu laden“ versuchen.') : 'Keine Wetterstation mit Wolkenmessung im Umkreis von 70 km.') + '</p>';
       return;
     }
+    const FC = store.get('fc') || {}, fcOf = win => FC[state.base + '|' + R.local(win.from != null ? win.from : win.start).ymd];
     el.innerHTML = P.map(({ k, win, h }) => {
-      const lv = R.level(h.chance);
+      const lv = R.level(h.chance), f = fcOf(win);
       const sky = h.chance == null ? 'keine Messung' : h.clearShare != null && h.clearShare < 0.2 ? 'bewölkt' : h.clearFrom != null ? 'klar ' + hh(h.clearFrom) + '–' + hh(h.clearTo) + ' Uhr' : 'bewölkt';
       return '<button type="button" class="night lv-' + lv.key + '" data-k="' + k + '" aria-pressed="' + (state.pastK === k) + '"><span class="d">' + esc(k === -1 ? 'Letzte Nacht' : win.label.replace(' Nacht', '')) + '</span><b>' + pct(h.chance) + '</b><span class="w">' + PAST_WORD[lv.key] + '</span>' +
-        '<small>' + esc(sky) + '<br>' + (h.kpMax != null ? 'Kp ' + num(h.kpMax, 0) + ' · ' : '') + (h.tMin != null ? 'bis ' + deg(h.tMin) : '') + '</small></button>';
+        '<small>' + esc(sky) + '<br>' + (h.kpMax != null ? 'Kp ' + num(h.kpMax, 0) + ' · ' : '') + (h.tMin != null ? 'bis ' + deg(h.tMin) : '') + (f ? '<br>Vorhersage war ' + pct(f.c) : '') + '</small></button>';
     }).join('');
     const good = P.filter(p => p.h.chance != null && p.h.chance >= 0.3).length, cold = Math.min(...P.map(p => p.h.tMin != null ? p.h.tMin : 99));
-    sum.innerHTML = 'Im Nachhinein hätte sich Rausgehen in <b>' + good + ' von 3 Nächten</b> gelohnt.' + (cold < 99 ? ' Am kältesten war es mit ' + deg(cold) + '.' : '');
+    /* Vorhersage gegen Messung: lohnt (ab 30 %) oder nicht */
+    const cmp = P.map(p => ({ f: fcOf(p.win), h: p.h })).filter(x => x.f && x.h.chance != null);
+    const hit = cmp.filter(x => (x.f.c >= 0.3) === (x.h.chance >= 0.3)).length;
+    const opt = cmp.filter(x => x.f.c >= 0.3 && x.h.chance < 0.1).length, cau = cmp.filter(x => x.f.c < 0.1 && x.h.chance >= 0.3).length;
+    sum.innerHTML = 'Im Nachhinein hätte sich Rausgehen in <b>' + good + ' von 3 Nächten</b> gelohnt.' + (cold < 99 ? ' Am kältesten war es mit ' + deg(cold) + '.' : '') +
+      (cmp.length ? ' Die Vorhersage lag in <b>' + hit + ' von ' + cmp.length + '</b> ' + (cmp.length === 1 ? 'Nacht' : 'Nächten') + ' richtig' + (opt ? ', ' + opt + '× zu optimistisch' : '') + (cau ? ', ' + cau + '× zu vorsichtig' : '') + '. <span class="small">(Vorhersage für euer Ziel, Messung an der Wetterstation.)</span>'
+        : ' <span class="small">Ab jetzt merkt sich die App jeden Abend ihre Vorhersage und vergleicht sie hier mit der Messung.</span>');
     const sel = P.find(p => p.k === state.pastK) || P[0], h = sel.h;
     const mo = (h.best || h.rows[Math.min(6, h.rows.length - 1)] || {}).moon;
     det.innerHTML = '<div class="hours"><h3>' + esc(sel.k === -1 ? 'Letzte Nacht' : sel.win.label) + ': Stunde für Stunde gemessen</h3><div class="strip past" role="img" aria-label="Gemessene Werte Stunde für Stunde">' + h.rows.map(x => {
@@ -891,6 +971,8 @@ details.more .inner { display: grid; gap: 0.8rem; }
     } else tiles.push(['Sonnenwind', '–', 'keine Daten']);
     if (d.ov && d.ov.grid) tiles.push(['Polarlicht-Oval', R.ovationNear(d.ov, ref.lat, ref.lon) + ' %', 'NOAA-Nowcast bis ' + clock(d.ov.valid)]);
     else tiles.push(['Polarlicht-Oval', '–', 'keine Daten']);
+    if (d.status && now - d.status.t < 30 * 60e3 && d.status.fmi.length) { const f0 = d.status.fmi[0], f1 = d.status.fmi[1]; tiles.push(['Magnetometer', R.fmiWord(f0.label), f0.name + ' R ' + f0.r + (f1 ? ', ' + f1.name + ' ' + R.fmiWord(f1.label) : '') + ', Stand ' + clock(d.status.t)]); }
+    else tiles.push(['Magnetometer', '–', store.get('topic') ? 'keine Meldung vom Wecker in den letzten 30 Min.' : 'ntfy-Thema beim Wecker eintragen']);
     $('sw').innerHTML = tiles.map(([l, b, s]) => '<div class="tile"><span class="l">' + l + '</span><b>' + esc(b) + '</b><small>' + esc(s) + '</small></div>').join('');
   }
   function renderKp() {
@@ -934,7 +1016,8 @@ details.more .inner { display: grid; gap: 0.8rem; }
       ['Polarlicht-Kameras und Magnetometer', 'Finnischer Wetterdienst: Kamerabilder aus Lappland und Magnetfeld live', 'https://www.ilmatieteenlaitos.fi/revontulet-ja-avaruussaa'],
       ['Magnetometer-Index (R-Index)', 'FMI: Aktivität je Station mit Schwellen für schwaches und starkes Polarlicht', 'https://space.fmi.fi/MIRACLE/RWC/r-index/en/'],
       ['Wolken bei Windy', 'Wolkenschichten rund um euren Standort', 'https://www.windy.com/?clouds,' + b.lat.toFixed(2) + ',' + b.lon.toFixed(2) + ',8'],
-      ['Polarlicht-Oval', 'NOAA, Vorhersage für die nächsten 30–90 Minuten', 'https://www.swpc.noaa.gov/products/aurora-30-minute-forecast']
+      ['Polarlicht-Oval', 'NOAA, Vorhersage für die nächsten 30–90 Minuten', 'https://www.swpc.noaa.gov/products/aurora-30-minute-forecast'],
+      ['Himmelskamera Kiruna', 'IRF, Schweden: aktuelles Bild und Verlauf der Nacht', 'https://www.irf.se/alis/allsky/krn/']
     ];
     $('links').innerHTML = L.map(([t, s, u]) => '<li><a href="' + u + '" target="_blank" rel="noopener">' + esc(t) + ' ↗<small>' + esc(s) + '</small></a></li>').join('');
   }
@@ -1159,6 +1242,85 @@ details.more .inner { display: grid; gap: 0.8rem; }
   $('w-th').value = String(store.get('th') || '0.55');
   $('w-th').addEventListener('change', () => store.set('th', $('w-th').value));
 
+  /* ---------- Vor der Reise: Checkliste (verschwindet, wenn alles erledigt ist) ---------- */
+  const PREP_END = Date.parse('2027-01-11T00:00:00+02:00');
+  function renderPrep() {
+    const el = $('prep'), man = store.get('prep') || {};
+    const standalone = matchMedia('(display-mode: standalone)').matches;
+    const items = [
+      { id: 'tiles', ok: !!store.get('tilesAt'), t: 'Karte für Funklöcher gespeichert', h: 'Am besten jetzt im WLAN, auf beiden Handys.', btn: 'Jetzt speichern (3,9 MB)' },
+      { id: 'gmaps', man: true, ok: !!man.gmaps, t: 'Google Maps: Offline-Karte für Lappland geladen', h: 'In Google Maps aufs Profilbild → Offlinekarten → Eigene Karte auswählen. Zwei Bereiche: rund um Rovaniemi und Sinettä, und von Hetta bis Kittilä. Im WLAN laden. Dann klappt „Route“ auch im Funkloch.' },
+      { id: 'ntfy', man: true, ok: !!man.ntfy, t: 'ntfy-App: Thema abonniert, Benachrichtigungen erlaubt', h: 'Für „Nicht stören“ freigeben, sonst weckt der Alarm nachts nicht. Auf beiden Handys.' },
+      { id: 'topic', ok: !!store.get('topic'), t: 'Dasselbe Thema hier in der App eingetragen', h: 'Unten beim Polarlicht-Wecker. Dann zeigt die App abends die Magnetometer-Werte.', btn: 'Zum Feld' },
+      { id: 'home', man: !standalone, ok: standalone || !!man.home, t: 'App auf dem Home-Bildschirm', h: 'Im Browser-Menü „Zum Startbildschirm hinzufügen“. Dann startet sie auch ohne Netz.' }
+    ];
+    const open = items.filter(x => !x.ok);
+    el.hidden = nowMs() > PREP_END || !open.length;
+    if (el.hidden) return;
+    $('prep-sum').textContent = (nowMs() < Date.parse('2027-01-03T00:00:00+02:00') ? 'Vor der Reise: ' : 'Noch offen: ') + (items.length - open.length) + ' von ' + items.length + ' erledigt';
+    $('prep-list').innerHTML = items.map(x => '<li class="' + (x.ok ? 'ok' : '') + '">' +
+      (x.man ? '<input type="checkbox" data-prep="' + x.id + '"' + (x.ok ? ' checked' : '') + ' aria-label="' + esc(x.t) + ' erledigt">' : '<span class="ck" aria-hidden="true">' + (x.ok ? '✓' : '○') + '</span>') +
+      '<span>' + esc(x.t) + '<small>' + esc(x.h) + '</small>' + (!x.ok && x.btn ? '<button type="button" class="go ghost" data-prep-btn="' + x.id + '">' + esc(x.btn) + '</button>' : '') + '</span></li>').join('');
+  }
+  $('prep-list').addEventListener('change', e => { const i = e.target.closest('input[data-prep]'); if (!i) return; const m = store.get('prep') || {}; m[i.dataset.prep] = i.checked; store.set('prep', m); renderPrep(); });
+  $('prep-list').addEventListener('click', async e => {
+    const b = e.target.closest('[data-prep-btn]'); if (!b) return;
+    if (b.dataset.prepBtn === 'tiles') { b.disabled = true; b.textContent = 'Speichert …'; await saveOffline(); renderPrep(); }
+    else if (b.dataset.prepBtn === 'topic') { $('w-topic').scrollIntoView({ block: 'center' }); $('w-topic').focus(); }
+  });
+
+  /* ---------- Live-Kamera Kiruna (nur nachts, Bild erst auf Tipp) ---------- */
+  const CAM_KRN = { name: 'Himmelskamera des IRF in Kiruna (Schweden)', lat: 67.8407, lon: 20.4104, url: 'https://www.irf.se/alis/allsky/krn/latest_small.jpeg' };
+  const liveCam = { on: false, timer: null };
+  function renderLiveCam(ds) {
+    const sec = $('livecam'); sec.hidden = !ds.darkNow || state.night !== 0;
+    if (sec.hidden) return;
+    const km = Math.round(R.haversineKm(center(), CAM_KRN) / 10) * 10;
+    $('livecam-note').textContent = CAM_KRN.name + ', etwa ' + km + ' km westlich von euch. Norden ist oben, Osten links. Die Uhrzeit unten rechts ist UTC, in Finnland ist es 2 Stunden später. Grüne Bögen oder Schleier sind Polarlicht. Sieht man dort welches, lohnt ein Blick nach Norden.';
+  }
+  function showLiveCam() {
+    const img = $('livecam-img');
+    img.hidden = false; img.src = CAM_KRN.url + '?t=' + Math.floor(Date.now() / 300e3);
+    $('livecam-load').textContent = 'Bild neu laden';
+  }
+  {
+    const img = $('livecam-img');
+    img.addEventListener('error', () => { img.hidden = true; $('livecam-load').textContent = 'Bild gerade nicht erreichbar, noch einmal versuchen'; });
+  }
+  $('livecam-load').addEventListener('click', () => {
+    liveCam.on = true; showLiveCam();
+    clearInterval(liveCam.timer); liveCam.timer = setInterval(() => { if (liveCam.on && !document.hidden && !$('livecam').hidden) showLiveCam(); }, 5 * 60e3);
+  });
+
+  /* ---------- Vorhersage merken (für den Vergleich im Rückblick) ---------- */
+  function saveForecast(c) {
+    if (!c || c.missing || !c.rec || state.night !== 0 || state.base === 'gps' || c.rec.verdict === 'hell') return;
+    const t = c.rec.target, d = state.data || {}, now = nowMs();
+    if (t.chance == null || c.win.from == null || !d.at || now - d.at > 2 * 3600e3) return;
+    const key = state.base + '|' + R.local(c.win.from).ymd, fc = store.get('fc') || {};
+    /* bis 19 Uhr laufend aktualisieren, danach gilt die Abendprognose */
+    if (fc[key] && now >= c.win.from + 3 * R.HOUR) return;
+    fc[key] = { c: Math.round(t.chance * 100) / 100, sky: t.pClear == null ? null : Math.round(t.pClear * 100) / 100, name: t.loc.name, at: now };
+    Object.keys(fc).forEach(k => { const ymd = k.split('|')[1]; if (!ymd || now - Date.parse(ymd + 'T12:00:00Z') > 14 * 86400e3) delete fc[k]; });
+    store.set('fc', fc);
+  }
+
+  /* ---------- ntfy-Thema für die Magnetometer-Werte (bleibt nur auf diesem Handy) ---------- */
+  function topicState() {
+    const t = store.get('topic'), d = state.data || {};
+    if (document.activeElement !== $('w-topic')) $('w-topic').value = t || '';
+    $('w-topic-save').textContent = t ? 'Ändern' : 'Speichern';
+    $('w-topic-state').textContent = !t ? 'Einmal eintragen, es bleibt nur auf diesem Handy gespeichert. Leer speichern entfernt es.'
+      : d.status ? 'Gespeichert. Letzte Meldung vom Wecker: ' + clock(d.status.t) + ' Uhr.'
+      : 'Gespeichert. Meldungen kommen abends, sobald der Wecker auf GitHub läuft (ab 03.01.).';
+  }
+  $('w-topic-save').addEventListener('click', () => {
+    const v = $('w-topic').value.trim();
+    if (v && !/^[-_A-Za-z0-9]{1,64}$/.test(v)) { $('w-topic-state').textContent = 'Der Name darf nur Buchstaben, Ziffern, - und _ enthalten.'; return; }
+    store.set('topic', v || null); if (!v) { localStorage.removeItem('pr-topic'); }
+    topicState(); renderPrep(); load(true);
+  });
+
   /* ---------- Gesamtablauf ---------- */
   let lastDay = null;
   function render() {
@@ -1167,6 +1329,7 @@ details.more .inner { display: grid; gap: 0.8rem; }
     if (ds.day !== lastDay) { $('cam-box').open = !ds.day; lastDay = ds.day; }
     const c = compute(); lastCompute = c;
     renderAnswer(c); renderNights(); renderPast(); renderList(c); renderCam(); renderSW(c); renderLinks(); renderKp(); render27(); drawMarkers(c);
+    renderPrep(); renderLiveCam(ds); topicState(); saveForecast(c);
     const d = state.data;
     if (state.loading) return;
     if (state.errors.length) setStamp(state.errors.join(' · '), true);

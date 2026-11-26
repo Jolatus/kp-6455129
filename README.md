@@ -38,11 +38,19 @@ Der Wecker in der App klingelt nur, wenn sie offen ist und das Handy am Ladekabe
    - **Variable** `BRIEFING` (optional): `0` schaltet das Abend-Briefing ab.
 4. Reiter **Actions** öffnen und Workflows erlauben, falls GitHub danach fragt. Dann **Polarlicht-Wecker → Run workflow** mit `test_push = 1`. Nach kurzer Zeit kommt eine Testnachricht. Mit `test_briefing = 1` und `dry_run = 0` kommt sofort ein Abend-Briefing.
 5. Fertig. Abends von 16 bis 5 Uhr finnischer Zeit prüft der Wecker alle 10 Minuten. Er weckt höchstens alle 90 Minuten einmal, außer die Magnetometer melden danach starkes Polarlicht. Gegen 17 Uhr kommt einmal am Tag ein leiser Ausblick auf die Nacht.
-6. Nach der Reise: **Actions → Polarlicht-Wecker → ··· → Disable workflow**.
+6. In der App unten beim **Polarlicht-Wecker** dasselbe Thema eintragen, auf beiden Handys. Es bleibt nur auf dem Handy gespeichert. Der Wecker schickt die Magnetometer-Werte alle 10 Minuten still an das Thema mit dem Zusatz `-status`. Dieses Thema bitte **nicht** in ntfy abonnieren, sonst piept es ständig. Die App holt die Werte dort ab und zeigt sie unter „Gerade jetzt“.
+7. Nach der Reise: **Actions → Polarlicht-Wecker → ··· → Disable workflow**.
 
 **Wann weckt er?** Wenn es dunkel ist und entweder die berechnete Chance für die laufende und die nächste Stunde über der Schwelle liegt, oder wenn die finnischen Magnetometer in eurer Nähe Aktivität melden und der Himmel zu mindestens 50 % klar ist. Er schaut dabei nur auf die Spots in der Nähe.
 
-**Was steht im Abend-Briefing?** Chance für heute Nacht, Ziel und Weg (auch ein Fernziel, wenn es rund um die Unterkunft zu ist), beste Zeit, Himmel, gefühlte Tiefsttemperatur, Mond, und ob die nächste Nacht deutlich besser wird. Mit Knopf „Route“ zu Google Maps. Es klingelt nicht laut.
+**Was steht im Abend-Briefing?** Chance für heute Nacht, Ziel und Weg (auch ein Fernziel, wenn es rund um die Unterkunft zu ist), bei längeren Wegen Abfahrt und Rückkehr, beste Zeit, Himmel, gefühlte Tiefsttemperatur, Mond, und ob die nächste Nacht deutlich besser wird. Mit Knopf „Route“ zu Google Maps. Es klingelt nicht laut.
+
+## In der App
+
+- **Vor der Reise:** Oben steht eine kurze Checkliste (Offline-Karte, Google-Maps-Offlinekarte, ntfy, Thema, Home-Bildschirm). Sie verschwindet, wenn alles erledigt ist.
+- **Unterwegs:** Bei Wegen ab 30 Minuten zeigt die App, wann ihr losfahren müsst und wann ihr zurück seid. Dazu kommen Schneefall, Böen und der Straßenzustand aus der Straßenwetter-Prognose von [Fintraffic](https://www.digitraffic.fi/) (CC BY 4.0).
+- **Live-Kamera:** Nachts auf Tipp das aktuelle Bild der Himmelskamera des [IRF in Kiruna](https://www.irf.se/alis/allsky/krn/).
+- **Rückblick:** Die App merkt sich jeden Abend ihre Vorhersage und vergleicht sie mit der Messung der Wetterstation.
 
 ## Gut zu wissen
 

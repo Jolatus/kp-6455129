@@ -234,12 +234,14 @@
         if (ov && isFinite(ov.valid) && t <= ov.valid + 30 * 60e3) { ovv = ovationNear(ov, loc.lat, loc.lon); pa = Math.max(pa, ovationFloor(ovv)); }
         /* Lokale Magnetometer (FMI-R-Index) sind die beste Aussage über „jetzt“ */
         if (o.actNow && now - o.actNow.t < 20 * 60e3 && lead >= 0 && lead <= 1) { const w = [0.7, 0.35][lead]; pa = (1 - w) * pa + w * o.actNow.p; }
-        let dc = null, eff = null, temp = null, feels = null, wind = null;
+        let dc = null, eff = null, temp = null, feels = null, wind = null, snow = null, gust = null;
         if (di && di.has(t)) {
           const j = di.get(t); eff = effCloud(D.cloud_cover_low[j], D.cloud_cover_mid[j], D.cloud_cover_high[j]); dc = detClear(eff);
           if (D.temperature_2m) temp = D.temperature_2m[j];
           if (D.apparent_temperature) feels = D.apparent_temperature[j];
           if (D.wind_speed_10m) wind = D.wind_speed_10m[j];
+          if (D.snowfall) snow = D.snowfall[j];
+          if (D.wind_gusts_10m) gust = D.wind_gusts_10m[j];
         }
         /* Beobachtung der nächsten Wetterstation zieht die erste und zweite Stunde Richtung Wirklichkeit */
         const w = ob && now - ob.t < 75 * 60e3 ? (t <= now && now < t + HOUR ? 0.5 : t > now && t <= now + HOUR ? 0.25 : 0) : 0;
@@ -254,7 +256,7 @@
         const pcRaw = ec != null && dc != null ? 0.6 * ec + 0.4 * dc : ec != null ? ec : dc;
         const pc = pcRaw == null ? null : pcRaw * RELIABLE;
         const moon = moonState(t + 30 * 60e3, loc.lat, loc.lon), mf = moonFactor(moon.light, pa);
-        return { t, dark, kp: k, pa, ov: ovv, eff, dc, ec, members, pc, obsW: w, temp, feels, wind, moon, mf, c: pc == null ? null : pc * pa * dark * mf };
+        return { t, dark, kp: k, pa, ov: ovv, eff, dc, ec, members, pc, obsW: w, temp, feels, wind, snow, gust, moon, mf, c: pc == null ? null : pc * pa * dark * mf };
       });
       const fEff = f0 + (1 - f0) * Math.max(0, Math.min(1, (kpMax - 3) / 3));
       const darkRows = rows.filter(r => r.dark > 0);
@@ -444,6 +446,51 @@
     return { cls: m.light < 0.3 ? 'ok' : 'mid', text: phase + ' (' + p + ' %), ' + (m.alt < 10 ? 'tief, ' : '') + effect };
   }
 
+  /* ---------- Unterwegs: Fahrplan, Wetter auf dem Weg, Straßenzustand ---------- */
+  /* Für längere Wege: wann losfahren, um zur guten Zeit dort zu sein, und wann man zurück ist.
+     Schneefall (cm/h) und Böen (km/h) am Ziel und an der Unterkunft in dieser Zeit. */
+  function tripPlan(r, homeRes) {
+    const sp = goodSpan(r);
+    if (!sp || !r.loc.min) return null;
+    const go = sp.from - r.loc.min * 60e3, back = sp.to + r.loc.min * 60e3;
+    const within = res => (res ? res.rows : []).filter(x => x.t + HOUR > go && x.t < back);
+    const rows = within(r).concat(homeRes && homeRes !== r ? within(homeRes) : []);
+    const mx = k => rows.reduce((a, x) => (x[k] != null && x[k] > a ? x[k] : a), 0);
+    return { from: sp.from, to: sp.to, go, back, snow: mx('snow'), gust: mx('gust') };
+  }
+  /* Straßenwetter-Prognose von Fintraffic (Digitraffic, forecast-sections): schlechtester Zustand im Zeitraum.
+     0 = normal, 1 = schlecht (glatt, im Lapplandwinter üblich), 2 = sehr schlecht. null = keine Angabe */
+  const ROAD_RANK = { NORMAL_CONDITION: 0, POOR_CONDITION: 1, EXTREMELY_POOR_CONDITION: 2 };
+  function roadWorst(json, from, to) {
+    let worst = null, slippery = false;
+    ((json && json.forecastSections) || []).forEach(sec => (sec.forecasts || []).forEach(f => {
+      const t = Date.parse(f.time);
+      if (!isFinite(t) || t < from - 2 * HOUR || t > to) return;
+      const k = ROAD_RANK[f.overallRoadCondition];
+      if (k != null && (worst == null || k > worst)) worst = k;
+      const fr = f.forecastConditionReason && f.forecastConditionReason.frictionCondition;
+      if (fr === 'VERY_SLIPPERY') slippery = true;
+    }));
+    return worst == null ? null : { worst, verySlippery: slippery };
+  }
+  /* Rechteck um zwei Orte für die Straßenabfrage (etwas Rand dazu) */
+  const corridor = (a, b) => ({ xMin: Math.min(a.lon, b.lon) - 0.15, yMin: Math.min(a.lat, b.lat) - 0.08, xMax: Math.max(a.lon, b.lon) + 0.15, yMax: Math.max(a.lat, b.lat) + 0.08 });
+
+  /* ---------- Magnetometer-Status vom Push-Wecker (ntfy-Thema + "-status") ---------- */
+  /* Der Wecker schickt alle 10 Minuten eine stille Meldung mit den FMI-R-Index-Werten. Neueste gültige zurückgeben. */
+  function parseStatus(txt) {
+    let best = null;
+    String(txt || '').split(/\r?\n/).forEach(l => {
+      try {
+        const j = JSON.parse(l); if (!j || j.event !== 'message') return;
+        const m = JSON.parse(j.message); if (!m || m.v !== 1 || !isFinite(m.t)) return;
+        if (!best || m.t > best.t) best = { t: m.t, base: m.base, p: isFinite(m.p) ? m.p : null, fmi: (m.fmi || []).map(x => ({ name: x[0], label: x[1], r: x[2], km: x[3] })) };
+      } catch (e) { /* keine Statusmeldung */ }
+    });
+    return best;
+  }
+  const fmiWord = label => ({ 'No activity': 'ruhig', 'Medium activity': 'aktiv', 'High activity': 'stark aktiv' }[label] || label);
+
   /* NOAA 27-Tage-Ausblick: Datum, Ap, größter Kp */
   const MON = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
   function parse27(txt) {
@@ -460,5 +507,5 @@
     return { rationale: r ? r[1].replace(/\s+/g, ' ').trim() : '', issued: issued.trim() };
   }
 
-  root.Radar = { TZ, HOUR, BASES, SPOTS, TRIP, local, localTime, baseForToday, windowFor, clampWindow, dayState, nightFactor, howText, mapsUrl, goodSpan, sunAlt, darkness, kpToP, parseKp, kpAt, reduceOvation, ovationNear, evaluate, recommend, haversineKm, effCloud, detClear, parseFmiObs, nearestObs, obsClear, parse27, parse3day, parseKpNow, RINDEX_THRESH, rIndexToP, level, skyWord, auroraWord, coldAdvice, moonState, moonFactor, moonWord, parseFmiSeries, hindsight };
+  root.Radar = { TZ, HOUR, BASES, SPOTS, TRIP, local, localTime, baseForToday, windowFor, clampWindow, dayState, nightFactor, howText, mapsUrl, goodSpan, sunAlt, darkness, kpToP, parseKp, kpAt, reduceOvation, ovationNear, evaluate, recommend, haversineKm, effCloud, detClear, parseFmiObs, nearestObs, obsClear, parse27, parse3day, parseKpNow, RINDEX_THRESH, rIndexToP, level, skyWord, auroraWord, coldAdvice, moonState, moonFactor, moonWord, parseFmiSeries, hindsight, tripPlan, roadWorst, corridor, parseStatus, fmiWord };
 })(typeof window !== 'undefined' ? window : globalThis);
