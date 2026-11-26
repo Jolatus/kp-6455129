@@ -63,7 +63,7 @@ const la = locs.map(l => l.lat).join(','), lo = locs.map(l => l.lon).join(',');
 const om = 'latitude=' + la + '&longitude=' + lo + '&past_days=1&forecast_days=3&timezone=GMT';
 const iso = ms => new Date(ms).toISOString().replace(/\.\d+Z$/, 'Z');
 
-const [det, ens, kpRaw, ovRaw, mag, obsXml, rmap, k1m] = await Promise.all([
+const [det, ens, kpRaw, ovRaw, mag, obsXml, rmap, k1m, rtswMag, rtswWind] = await Promise.all([
   safe(get('https://api.open-meteo.com/v1/forecast?' + om + '&hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high,temperature_2m,apparent_temperature,wind_speed_10m,snowfall,wind_gusts_10m&models=metno_seamless')),
   safe(get('https://ensemble-api.open-meteo.com/v1/ensemble?' + om + '&hourly=cloud_cover&models=ecmwf_ifs025,icon_seamless', 'json', 45000)),
   safe(get('https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json')),
@@ -72,7 +72,10 @@ const [det, ens, kpRaw, ovRaw, mag, obsXml, rmap, k1m] = await Promise.all([
   safe(get('https://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFeature&storedquery_id=fmi::observations::weather::simple&bbox=20,66,30,70.2&parameters=n_man&starttime=' + iso(now - 40 * 60e3) + '&endtime=' + iso(now), 'text')),
   /* Offizieller Aktivitätsindex der finnischen Magnetometer (R-Index mit Schwellen je Station) */
   safe(get('https://space.fmi.fi/MIRACLE/RWC/r-index/api/map-en-esa.json')),
-  safe(get('https://services.swpc.noaa.gov/json/planetary_k_index_1m.json'))
+  safe(get('https://services.swpc.noaa.gov/json/planetary_k_index_1m.json')),
+  /* Sonnenwind als Minutenwerte des letzten Tages (je etwa 1–2 MB), für das 30-Minuten-Mittel */
+  safe(get('https://services.swpc.noaa.gov/json/rtsw/rtsw_mag_1m.json', 'json', 45000)),
+  safe(get('https://services.swpc.noaa.gov/json/rtsw/rtsw_wind_1m.json', 'json', 45000))
 ]);
 if (!det && !ens) { console.log('Keine Wolkendaten, Abbruch.'); process.exit(0); }
 
@@ -92,12 +95,24 @@ const actNow = rP.length ? { p: Math.max(...rP), t: now } : null;
 
 const stations = obsXml ? R.parseFmiObs(obsXml) : [];
 const obs = locs.map(l => R.nearestObs(stations, l.lat, l.lon, 40));
-const bz = mag && mag[0] && now - Date.parse(mag[0].time_tag) < 90 * 60e3 ? +mag[0].bz_gsm : null;
+/* Sonnenwind: 30-Minuten-Mittel, sonst der letzte Einzelwert der Kurzübersicht */
+const sw = R.solarWind(rtswMag, rtswWind, now);
+const bz = sw ? sw.bz : mag && mag[0] && now - Date.parse(mag[0].time_tag) < 90 * 60e3 ? +mag[0].bz_gsm : null;
+const v = sw ? sw.v : null;
 const kpNow = R.parseKpNow(k1m);
 const kp = R.parseKp(kpRaw);
 const ov = ovRaw ? R.reduceOvation(ovRaw) : null;
 const DET = det ? [].concat(det) : null, ENS = ens ? [].concat(ens) : null;
-const run = (win, withMagnet) => R.evaluate({ locs, det: DET, ens: ENS, kp, ov, bz, obs, kpNow, actNow: withMagnet ? actNow : null, now, win });
+const run = (win, withMagnet) => R.evaluate({ locs, det: DET, ens: ENS, kp, ov, bz, v, obs, kpNow, actNow: withMagnet ? actNow : null, now, win });
+/* Stärkster erwarteter Kp im Fenster, mit NOAA-Sturmstufe */
+function stormIn(win) {
+  let best = null;
+  for (let t = Math.max(win.start, now - R.HOUR); t <= win.end; t += R.HOUR) {
+    let row = null; for (const r of kp) { if (r.t <= t) row = r; else break; }
+    if (row && (!best || row.kp > best.kp)) best = { kp: row.kp, g: row.g, t: Math.max(t, row.t) };
+  }
+  return best;
+}
 
 /* Texte wie in der App */
 const pct = v => v == null ? '–' : v < 0.05 ? 'unter 5 %' : Math.round(v * 20) * 5 + ' %';
@@ -110,7 +125,7 @@ const actionsFor = l => [].concat(l && l.min > 0 ? [{ action: 'view', label: 'Ro
 /* ---------- 0. Stille Statusmeldung für die App: Magnetometer-Werte ----------
    Thema = NTFY_TOPIC + "-status". Die Handys abonnieren es nicht, nur die App liest es (ntfy erlaubt Abrufe aus dem Browser). */
 async function status() {
-  const payload = { v: 1, t: now, base, fmi: fmi.map(s => [s.name, s.label, s.r, Math.round(s.km)]), p: actNow ? Math.round(actNow.p * 100) / 100 : null };
+  const payload = { v: 1, t: now, base, fmi: fmi.map(s => [s.name, s.label, s.r, Math.round(s.km)]), p: actNow ? Math.round(actNow.p * 100) / 100 : null, sw: sw ? [sw.bz, sw.v, sw.t] : null };
   if (env.DRY_RUN || !env.NTFY_TOPIC) { console.log('Status (nicht gesendet):', JSON.stringify(payload)); return; }
   try {
     const r = await fetch(NTFY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ topic: env.NTFY_TOPIC + '-status', message: JSON.stringify(payload), priority: 1, tags: ['status'] }) });
@@ -146,6 +161,8 @@ async function briefing() {
     if (plan.gust >= 50) lines.push('Böen bis ' + Math.round(plan.gust) + ' km/h.');
   }
   lines.push('Himmel ' + R.skyWord(t.pClear) + ' (' + pct(t.pClear) + '), Polarlicht ' + R.auroraWord(t.pAur) + '.');
+  const st = stormIn(n0.win);
+  if (st && st.g >= 1) lines.push('NOAA erwartet einen ' + R.gWord(st.g) + 'en Sturm (G' + st.g + ') ab etwa ' + hh(st.t) + ' Uhr.');
   if (t.feelsMin != null) lines.push('Gefühlt bis ' + deg(t.feelsMin) + '.');
   const mo = t.best && t.best.moon; if (mo && mo.light >= 0.3) lines.push('Mond: ' + R.moonWord(mo).text + '.');
   const r1 = n1.rec && n1.rec.target;
@@ -174,7 +191,7 @@ async function alarm() {
   const fmiTxt = fmi.length ? 'FMI-Magnetometer: ' + fmi.map(s => s.name + ' ' + ({ 'No activity': 'ruhig', 'Medium activity': 'aktiv', 'High activity': 'stark aktiv' }[s.label] || s.label) + ' (R ' + s.r + ')').join(', ') + '.' : '';
   const message = where(target.loc) + '. Chance ' + pct(target.chance) + ', Himmel ' + R.skyWord(target.pClear) + ' (' + pct(target.pClear) + '), Polarlicht ' + R.auroraWord(target.pAur) + '. ' + (target.tFirst != null ? 'Draußen ' + deg(target.tFirst) + '. ' : '') + fmiTxt;
   const title = fmiHigh ? 'Starkes Polarlicht gemessen, jetzt raus!' : byMagnet ? 'Magnetometer schlagen aus, jetzt raus!' : 'Gute Polarlicht-Chance, jetzt raus!';
-  console.log(new Date(now).toISOString(), '| Basis', base, '| Urteil', rec.verdict, '| Ziel', target.loc.name, pct(target.chance), '| klar', pct(target.pClear), '| aktiv', pct(target.pAur), '| Bz', bz, '| Kp gemessen', kpNow && kpNow.kp.toFixed(2), '| FMI', JSON.stringify(fmi.map(s => [s.name, s.label, s.r])), 'P', actNow && actNow.p.toFixed(2), '| Wetterstationen', stations.length, '| Beobachtung am Ziel', JSON.stringify(obs[locs.findIndex(l => l.id === target.loc.id)]));
+  console.log(new Date(now).toISOString(), '| Basis', base, '| Urteil', rec.verdict, '| Ziel', target.loc.name, pct(target.chance), '| klar', pct(target.pClear), '| aktiv', pct(target.pAur), '| Bz', bz, sw ? '(Mittel 30 Min., ' + v + ' km/s)' : '(Einzelwert)', '| Kp gemessen', kpNow && kpNow.kp.toFixed(2), '| FMI', JSON.stringify(fmi.map(s => [s.name, s.label, s.r])), 'P', actNow && actNow.p.toFixed(2), '| Wetterstationen', stations.length, '| Beobachtung am Ziel', JSON.stringify(obs[locs.findIndex(l => l.id === target.loc.id)]));
   if (!trigger) { console.log('Kein Alarm (dunkel: ' + dark + ', Chance ≥ ' + THRESHOLD + ': ' + byChance + ', Magnetometer aktiv und klar: ' + byMagnet + ')'); return; }
   console.log('AUSLÖSEN: ' + title + ' ' + message);
   /* Nicht öfter als alle 90 Minuten wecken. Ausnahme: Es wird jetzt stark und das wurde noch nicht gemeldet. */
