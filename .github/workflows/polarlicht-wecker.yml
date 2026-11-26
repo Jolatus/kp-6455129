@@ -1,4 +1,5 @@
 # Polarlicht-Wecker: prüft abends und nachts alle 10 Minuten und schickt bei guter Chance eine Push-Nachricht über ntfy.
+# Gegen 17 Uhr Ortszeit kommt außerdem ein leiser Ausblick auf die Nacht (Abend-Briefing).
 # Zeiten in UTC. 14–02 Uhr UTC entspricht 16–04 Uhr in Finnland (Winterzeit).
 # Einrichten: siehe README.md. Nach der Reise unter „Actions“ den Workflow deaktivieren.
 name: Polarlicht-Wecker
@@ -14,13 +15,16 @@ on:
       test_push:
         description: 'Testnachricht aufs Handy schicken (1 = ja)'
         default: '0'
+      test_briefing:
+        description: 'Abend-Briefing sofort erstellen (1 = ja, mit dry_run = 0 kommt es aufs Handy)'
+        default: '0'
 jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
       - name: Bedingungen prüfen und ggf. wecken
@@ -30,5 +34,7 @@ jobs:
           THRESHOLD: ${{ vars.THRESHOLD }}
           BASE: ${{ vars.BASE }}
           SITE_URL: ${{ vars.SITE_URL }}
+          BRIEFING: ${{ vars.BRIEFING }}
           DRY_RUN: ${{ github.event.inputs.dry_run == '1' && '1' || '' }}
           TEST_PUSH: ${{ github.event.inputs.test_push == '1' && '1' || '' }}
+          TEST_BRIEFING: ${{ github.event.inputs.test_briefing == '1' && '1' || '' }}
