@@ -172,8 +172,11 @@ p { margin: 0; }
 .howto { margin: 0; padding-left: 1.1rem; display: grid; gap: 0.25rem; font-size: 0.84rem; color: var(--muted); }
 .howto b { color: var(--ink); font-weight: 650; }
 .leaflet-container { font: 12px/1.4 var(--font); background: #0A0F18; }
-.night-tiles { filter: invert(1) hue-rotate(185deg) brightness(0.62) contrast(1.15) saturate(0.35); }
-.red .night-tiles { filter: grayscale(1) invert(1) brightness(0.35) sepia(1) hue-rotate(-45deg) saturate(5); }
+.night-tiles { filter: invert(1) hue-rotate(185deg) brightness(0.92) contrast(1.05) saturate(0.45); }
+.red .night-tiles { filter: grayscale(1) invert(1) brightness(0.5) sepia(1) hue-rotate(-45deg) saturate(5); }
+.map-here { font: 600 13px/1 var(--font); padding: 8px 11px; background: #0C1220 !important; color: #E8EEF8; border: 1px solid #6CC4E8 !important; border-radius: 10px !important; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+.map-here[hidden] { display: none !important; }
+.red .map-here { background: #0D0000 !important; color: #F0453A; border-color: #9C2A20 !important; }
 .leaflet-control-attribution { background: rgba(5, 7, 13, 0.7) !important; color: #8E9BB3 !important; }
 .leaflet-control-attribution a { color: #A9C4E8 !important; }
 .leaflet-tooltip.mk-tip { background: #0C1220; color: #E8EEF8; border: 1px solid #22304A; box-shadow: none; font-weight: 600; padding: 2px 7px; }
@@ -520,7 +523,7 @@ html.map-open, html.map-open body { overflow: hidden; }
     base: tripBase || store.get('base') || 'see',
     night: 0,
     gps: null, focus: null, data: store.get('data3'), loading: false, errors: [],
-    pastK: -1, phone: store.get('phone') || 'p9', glow: null, grid: store.get('grid')
+    pastK: -1, phone: store.get('phone') || 'p9', glow: null, grid: store.get('grid2')
   };
   if (state.base === 'gps' || !R.BASES[state.base]) state.base = 'see';
 
@@ -539,7 +542,7 @@ html.map-open, html.map-open body { overflow: hidden; }
     const btn = e.target.closest('button'); if (!btn) return;
     const k = btn.dataset.base; state.focus = null;
     if (k === 'gps') { locate(); return; }
-    state.base = k; store.set('base', k); renderSeg(); render(); load(false); loadGrid();
+    state.base = k; store.set('base', k); map.gridView = null; renderSeg(); render(); load(false); loadGrid();
   });
 
   function locate() {
@@ -547,7 +550,7 @@ html.map-open, html.map-open body { overflow: hidden; }
     setStamp('Standort wird bestimmt …');
     navigator.geolocation.getCurrentPosition(p => {
       state.gps = { lat: +p.coords.latitude.toFixed(3), lon: +p.coords.longitude.toFixed(3) };
-      state.base = 'gps'; renderSeg(); load(true); loadGrid(true);
+      state.base = 'gps'; map.gridView = null; renderSeg(); load(true); loadGrid(true);
     }, () => { state.errors = ['Standort nicht freigegeben. Erlaubt den Standort im Browser oder wählt eine Unterkunft.']; renderSeg(); render(); }, { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 });
   }
 
@@ -1090,6 +1093,25 @@ html.map-open, html.map-open body { overflow: hidden; }
       }
     });
     new Full().addTo(m);
+    /* Knopf unten links: Wolkendaten für den sichtbaren Ausschnitt laden */
+    const Here = L.Control.extend({
+      options: { position: 'bottomleft' },
+      onAdd() {
+        const b = L.DomUtil.create('button', 'leaflet-bar map-here');
+        b.type = 'button'; b.hidden = true; b.textContent = 'Wolken hier laden';
+        L.DomEvent.disableClickPropagation(b);
+        L.DomEvent.on(b, 'click', e => { L.DomEvent.preventDefault(e); loadGrid(true, viewGrid()); });
+        map.hereBtn = b;
+        return b;
+      }
+    });
+    new Here().addTo(m);
+    m.on('moveend', checkCover);
+    /* Größe der Karte ändert sich (Vollbild, Drehen): Leaflet muss neu messen, sonst bleibt nur der alte Ausschnitt gefüllt */
+    if ('ResizeObserver' in window) {
+      let raf = 0;
+      new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => m.invalidateSize({ animate: false })); }).observe($('map'));
+    }
     map.ready = true;
     const c = center(); m.setView([c.lat, c.lon], 9);
     explainMap();
@@ -1112,7 +1134,8 @@ html.map-open, html.map-open body { overflow: hidden; }
     box.classList.toggle('full', on);
     document.documentElement.classList.toggle('map-open', on);
     fullIcon(on);
-    setTimeout(() => { if (map.ready) map.m.invalidateSize(); }, 80);
+    [80, 300, 700].forEach(ms => setTimeout(() => { if (map.ready) map.m.invalidateSize({ animate: false }); }, ms));
+    if (on) setTimeout(() => { if (map.ready && cover() < 0.6) loadGrid(true, viewGrid()); }, 900);
   }
   async function toggleFull() {
     const box = document.querySelector('.mapbox');
@@ -1124,7 +1147,31 @@ html.map-open, html.map-open body { overflow: hidden; }
     /* Echter Vollbildmodus, wo erlaubt (Android). Sonst bleibt die feste Ebene über der Seite. */
     try { if (box.requestFullscreen) await box.requestFullscreen({ navigationUI: 'hide' }); } catch (e) { /* feste Ebene reicht */ }
   }
-  document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && document.querySelector('.mapbox').classList.contains('full')) setFull(false); });
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement && document.querySelector('.mapbox').classList.contains('full')) setFull(false);
+    else [100, 400].forEach(ms => setTimeout(() => { if (map.ready) map.m.invalidateSize({ animate: false }); }, ms));
+  });
+  /* Wie viel des Ausschnitts, der sich laden ließe, ist schon mit Wolkendaten abgedeckt? (0 bis 1)
+     Gemessen am begrenzten Ausschnitt aus viewGrid(), sonst bliebe der Knopf bei weit herausgezoomter Karte immer sichtbar. */
+  function cover() {
+    const g = state.grid; if (!g || !map.ready) return 0;
+    const v = viewGrid(0);
+    const ix = Math.max(0, Math.min(v.lonMax, g.lonMax) - Math.max(v.lonMin, g.lonMin)), iy = Math.max(0, Math.min(v.latMax, g.latMax) - Math.max(v.latMin, g.latMin));
+    return (ix * iy) / Math.max(1e-6, (v.lonMax - v.lonMin) * (v.latMax - v.latMin));
+  }
+  function checkCover() {
+    const b = map.hereBtn; if (!b) return;
+    /* außerhalb des Modellgebiets (Nordeuropa) gibt es nichts zu laden */
+    const v = map.ready ? viewGrid(0) : null, inArea = v && (v.latMax - v.latMin) * (v.lonMax - v.lonMin) > 0.05;
+    b.hidden = !(map.layer === 'cloud' || map.layer === 'temp') || !state.grid || !inArea || cover() >= 0.6;
+  }
+  /* Raster für den sichtbaren Ausschnitt, etwas größer, aber höchstens ca. 3,6° × 8° und im Gebiet von MET Nordic */
+  function viewGrid(pad) {
+    const b = map.m.getBounds().pad(pad == null ? 0.08 : pad), cLat = (b.getSouth() + b.getNorth()) / 2, cLon = (b.getWest() + b.getEast()) / 2;
+    const hLat = Math.min(1.8, (b.getNorth() - b.getSouth()) / 2), hLon = Math.min(4, (b.getEast() - b.getWest()) / 2);
+    const clamp = (v, a, z) => Math.max(a, Math.min(z, v));
+    return { latMin: clamp(cLat - hLat, 54, 71.5), latMax: clamp(cLat + hLat, 54, 71.5), lonMin: clamp(cLon - hLon, 0, 35), lonMax: clamp(cLon + hLon, 0, 35) };
+  }
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.querySelector('.mapbox').classList.contains('full') && !document.fullscreenElement) setFull(false); });
 
   $('seg-layer').addEventListener('click', e => {
@@ -1139,12 +1186,12 @@ html.map-open, html.map-open body { overflow: hidden; }
     const model = map.layer === 'cloud' || map.layer === 'temp';
     $('map-slider').hidden = !model;
     const ramp = $('ramp');
-    if (map.layer === 'cloud') ramp.innerHTML = '<div class="bar" style="background:linear-gradient(90deg, rgba(226,234,246,0) 0%, rgba(226,234,246,0.45) 45%, rgba(226,234,246,0.85) 100%), #0A0F18"></div><div class="lab"><span>klar</span><span>teils bewölkt</span><span>bedeckt</span></div>';
+    if (map.layer === 'cloud') ramp.innerHTML = '<div class="bar" style="background:linear-gradient(90deg, rgba(91,224,168,0.45) 0%, rgba(91,224,168,0.4) 20%, rgba(180,232,212,0.55) 50%, rgba(238,242,248,0.9) 100%), #1A2232"></div><div class="lab"><span>klar</span><span>teils bewölkt</span><span>bedeckt</span></div>';
     else if (map.layer === 'temp') ramp.innerHTML = '<div class="bar" style="background:linear-gradient(90deg,' + TSTOPS.map(([t, c2]) => 'rgb(' + c2.join(',') + ') ' + Math.round((t + 35) / 40 * 100) + '%').join(',') + ')"></div><div class="lab"><span>−35 °C</span><span>−25</span><span>−15</span><span>−5</span><span>+5 °C</span></div>';
     else ramp.innerHTML = '';
     $('mk-legend').innerHTML = '<span><i style="background:' + LV_COL.gut + '"></i>gute Chance</span><span><i style="background:' + LV_COL.mittel + '"></i>mittel</span><span><i style="background:' + LV_COL.klein + '"></i>klein</span><span><span class="sq">3/8</span>Wetterstation</span><span><span class="sq" style="width:0.95rem">⌂</span>Unterkunft</span>';
     const H = {
-      cloud: ['<b>Dunkle Flächen = klarer Himmel.</b> Dort könnt ihr Polarlicht sehen. Weiße Flächen sind Wolken.', 'Mit dem Regler oder ▶ seht ihr, wohin die Wolken in den nächsten Stunden ziehen.', '<b>Der grün beschriftete Spot ist euer Ziel.</b> Tippt auf einen Spot für Chance und Temperatur.', 'Kästchen sind echte Messungen: 0/8 = wolkenlos, 8/8 = ganz bedeckt.', '<b>Vollbild:</b> Knopf oben rechts in der Karte. Zurück mit demselben Knopf oder der Zurück-Geste.'],
+      cloud: ['<b>Grünliche Flächen = klarer Himmel.</b> Dort könnt ihr Polarlicht sehen. Weiße Flächen sind Wolken.', 'Der gestrichelte Rahmen zeigt, wofür Wolkendaten geladen sind. Schiebt ihr die Karte darüber hinaus, erscheint unten links „Wolken hier laden“.', 'Mit dem Regler oder ▶ seht ihr, wohin die Wolken in den nächsten Stunden ziehen.', '<b>Der grün beschriftete Spot ist euer Ziel.</b> Tippt auf einen Spot für Chance und Temperatur.', 'Kästchen sind echte Messungen: 0/8 = wolkenlos, 8/8 = ganz bedeckt.', '<b>Vollbild:</b> Knopf oben rechts in der Karte. Zurück mit demselben Knopf oder der Zurück-Geste.'],
       temp: ['<b>Farbe = Temperatur</b> in 2 m Höhe zur gewählten Stunde. Lila ist am kältesten.', 'Seen und Täler sind in klaren Nächten oft noch kälter als hier gezeigt.', 'Tippt auf einen Spot für die gefühlte Temperatur.'],
       ir: ['Aktuelles Infrarotbild des Wettersatelliten, alle 10 Minuten neu. Hohe Wolken erscheinen hell.', 'Lappland sieht der Satellit sehr flach von der Seite. Kalter Schnee und tiefe Wolken sehen fast gleich aus, deshalb nur zur Kontrolle.'],
       fog: ['Satellitenbild für Nebel und tiefe Wolken in der Nacht: Sie erscheinen grünlich bis türkis.', 'Bei 68° N nur grob, die Wolken-Ebene ist verlässlicher.']
@@ -1155,30 +1202,38 @@ html.map-open, html.map-open body { overflow: hidden; }
   /* Raster rund um den Standort aus dem 1-km-Modell MET Nordic: Wolken und Temperatur, 12 Stunden.
      Zählt bei Open-Meteo wie 256 Abrufe, deshalb nur laden, wenn die Karte in Sicht kommt, und nicht zu oft.
      Tagsüber beginnt es mit der Dunkelheit, damit der Regler den Abend zeigt. */
-  async function loadGrid(force) {
+  async function loadGrid(force, view) {
     if (!map.ready) return;
+    if (view) map.gridView = view;
     if (!map.visible) { if (force) map.forceNext = true; drawOverlay(); return; }
     force = force || map.forceNext; map.forceNext = false;
-    const c = center(), key = c.lat.toFixed(2) + ',' + c.lon.toFixed(2), ds = dayNow();
+    /* Standard: Rechteck um die Unterkunft (deckt auch die Fernziele ab). Nach „Wolken hier laden“: der gewählte Ausschnitt */
+    const c = center(), dLat0 = 0.8, dLon0 = 2.4, v = map.gridView;
+    const ext = v || { latMin: c.lat - dLat0, latMax: c.lat + dLat0, lonMin: c.lon - dLon0, lonMax: c.lon + dLon0 };
+    const key = v ? 'v:' + [ext.latMin, ext.latMax, ext.lonMin, ext.lonMax].map(x => x.toFixed(1)).join(',') : c.lat.toFixed(2) + ',' + c.lon.toFixed(2), ds = dayNow();
     const g = state.grid;
     if (!force && g && g.key === key && nowMs() - g.at < (ds.day ? 90 : 45) * 60e3) { drawOverlay(); return; }
     const h0 = Math.floor(nowMs() / R.HOUR) * R.HOUR, t0 = ds.day && ds.darkFrom ? Math.floor(ds.darkFrom / R.HOUR) * R.HOUR : h0;
     const hourIso = t => new Date(t).toISOString().slice(0, 13) + ':00';
-    const NY = 16, NX = 16, dLat = 0.62, dLon = 1.55, lats = [], lons = [];
-    for (let i = 0; i < NY; i++) for (let j = 0; j < NX; j++) { lats.push((c.lat - dLat + 2 * dLat * i / (NY - 1)).toFixed(3)); lons.push((c.lon - dLon + 2 * dLon * j / (NX - 1)).toFixed(3)); }
+    const NY = 16, NX = 16, lats = [], lons = [];
+    for (let i = 0; i < NY; i++) for (let j = 0; j < NX; j++) { lats.push((ext.latMin + (ext.latMax - ext.latMin) * i / (NY - 1)).toFixed(3)); lons.push((ext.lonMin + (ext.lonMax - ext.lonMin) * j / (NX - 1)).toFixed(3)); }
+    if (map.hereBtn) { map.hereBtn.disabled = true; map.hereBtn.textContent = 'Lädt Wolken …'; }
     try {
       const j = await getData('https://api.open-meteo.com/v1/forecast?latitude=' + lats.join(',') + '&longitude=' + lons.join(',') + '&hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high,temperature_2m&models=metno_seamless&start_hour=' + hourIso(t0) + '&end_hour=' + hourIso(t0 + 12 * R.HOUR) + '&timezone=GMT', 'json', 30000);
       const arr = [].concat(j), times = arr[0].hourly.time.map(t => Date.parse(t + 'Z'));
       const eff = times.map((_, k) => arr.map(p => { const h = p.hourly; return Math.round(R.effCloud(h.cloud_cover_low[k], h.cloud_cover_mid[k], h.cloud_cover_high[k])); }));
       const temp = times.map((_, k) => arr.map(p => p.hourly.temperature_2m[k] == null ? null : Math.round(p.hourly.temperature_2m[k] * 10) / 10));
-      state.grid = { key, at: nowMs(), NY, NX, latMin: c.lat - dLat, latMax: c.lat + dLat, lonMin: c.lon - dLon, lonMax: c.lon + dLon, times, eff, temp };
-      store.set('grid', state.grid); /* für offline: letzter Stand der Wolkenkarte */
+      state.grid = { key, at: nowMs(), NY, NX, latMin: ext.latMin, latMax: ext.latMax, lonMin: ext.lonMin, lonMax: ext.lonMax, times, eff, temp };
+      store.set('grid2', state.grid); /* für offline: letzter Stand der Wolkenkarte */
       gridSlider(true);
-      if (!g || g.key !== key) map.m.fitBounds([[c.lat - dLat * 0.8, c.lon - dLon * 0.8], [c.lat + dLat * 0.8, c.lon + dLon * 0.8]]);
+      if (!v && (!g || g.key !== key)) map.m.fitBounds([[c.lat - 0.5, c.lon - 1.25], [c.lat + 0.5, c.lon + 1.25]]);
       drawOverlay();
     } catch (e) {
       /* ohne Netz: gespeicherten Stand zeigen, wenn er zum Standort passt */
       if (g && g.key === key) { gridSlider(false); drawOverlay(); } else $('map-hour-l').textContent = 'keine Daten';
+    } finally {
+      if (map.hereBtn) { map.hereBtn.disabled = false; map.hereBtn.textContent = 'Wolken hier laden'; }
+      checkCover();
     }
   }
   /* Regler auf die laufende Stunde stellen (bei altem Stand liegen die ersten Stunden in der Vergangenheit) */
@@ -1191,7 +1246,9 @@ html.map-open, html.map-open body { overflow: hidden; }
   function drawOverlay() {
     if (!map.ready) return;
     if (map.overlay) { map.m.removeLayer(map.overlay); map.overlay = null; }
+    if (map.outline) { map.m.removeLayer(map.outline); map.outline = null; }
     const g = state.grid;
+    checkCover();
     if (!g || (map.layer !== 'cloud' && map.layer !== 'temp')) return;
     const k = Math.min(+$('map-hour').value, g.times.length - 1);
     const h0 = Math.floor(nowMs() / R.HOUR) * R.HOUR;
@@ -1213,14 +1270,20 @@ html.map-open, html.map-open body { overflow: hidden; }
         const o = (py * W + px) * 4;
         if (!isFinite(e)) { img.data[o + 3] = 0; continue; }
         let col, a;
-        if (map.layer === 'cloud') { col = red ? [255, 70, 58] : [226, 234, 246]; a = Math.max(0, Math.min(1, (e - 10) / 80)) * 0.85; }
+        if (map.layer === 'cloud') {
+          /* 0 = klar (grünlich), 1 = bedeckt (weiß). Klarer Himmel ist so sichtbar statt nur schwarz. */
+          const t = Math.max(0, Math.min(1, (e - 15) / 60)), A = red ? CLEAR_RED : CLEAR_COL, B = red ? CLOUD_RED : CLOUD_COL;
+          col = A.map((x, n) => Math.round(x + (B[n] - x) * t)); a = 0.24 + 0.52 * t;
+        }
         else { col = tColor(e); if (red) { const l = (col[0] + col[1] + col[2]) / 3; col = [Math.round(80 + l * 0.7), 20, 15]; } a = 0.6; }
         img.data[o] = col[0]; img.data[o + 1] = col[1]; img.data[o + 2] = col[2]; img.data[o + 3] = Math.round(a * 255);
       }
     }
     ctx.putImageData(img, 0, 0);
     map.overlay = L.imageOverlay(cv.toDataURL(), [[g.latMin, g.lonMin], [g.latMax, g.lonMax]], { opacity: 1, interactive: false }).addTo(map.m);
+    map.outline = L.rectangle([[g.latMin, g.lonMin], [g.latMax, g.lonMax]], { color: red ? '#9C2A20' : '#8E9BB3', weight: 1, dashArray: '4 5', fill: false, interactive: false }).addTo(map.m);
   }
+  const CLEAR_COL = [91, 224, 168], CLOUD_COL = [238, 242, 248], CLEAR_RED = [110, 22, 16], CLOUD_RED = [255, 90, 74];
   $('map-hour').addEventListener('input', () => { drawOverlay(); drawMarkers(lastCompute); });
   $('map-play').addEventListener('click', () => {
     if (map.playing) { clearInterval(map.playing); map.playing = null; $('map-play').textContent = '▶'; return; }
