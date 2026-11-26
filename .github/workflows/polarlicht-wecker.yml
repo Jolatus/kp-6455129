@@ -1,12 +1,12 @@
 # Polarlicht-Wecker: prüft abends und nachts alle 10 Minuten und schickt bei guter Chance eine Push-Nachricht über ntfy.
 # Gegen 17 Uhr Ortszeit kommt außerdem ein leiser Ausblick auf die Nacht (Abend-Briefing).
-# Zeiten in UTC. 14–02 Uhr UTC entspricht 16–04 Uhr in Finnland (Winterzeit).
+# Zeiten in UTC. 14–02 Uhr UTC entspricht 16–04 Uhr in Finnland (Winterzeit). Start jeweils 3 Minuten nach der vollen Zehnerminute, weil GitHub Läufe zur vollen Stunde oft verzögert.
 # Einrichten: siehe README.md. Nach der Reise unter „Actions“ den Workflow deaktivieren.
 name: Polarlicht-Wecker
 on:
   schedule:
-    - cron: '*/10 14-23 * * *'
-    - cron: '*/10 0-2 * * *'
+    - cron: '3-59/10 14-23 * * *'
+    - cron: '3-59/10 0-2 * * *'
   workflow_dispatch:
     inputs:
       dry_run:
