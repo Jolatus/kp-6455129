@@ -73,7 +73,7 @@
     return hit ? hit[1] : null;
   }
 
-  /* Zeitfenster: „jetzt“ = aktuelle Stunde plus 3 h, „nacht“ = 16–02 Uhr Ortszeit.
+  /* Zeitfenster: „jetzt“ = aktuelle Stunde plus 3 h, „nacht“ = 16–04 Uhr Ortszeit.
      k = 0 heute Nacht, 1 morgen Nacht, 2 übermorgen */
   const WD = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
   function windowFor(mode, now, k) {
@@ -81,9 +81,9 @@
     if (mode === 'jetzt') return { start: h0, end: h0 + 3 * HOUR, label: 'Nächste 3 Stunden' };
     k = k || 0;
     const l = local(now);
-    const base = l.h < 2 ? local(now - 12 * HOUR) : l; /* nach Mitternacht zählt noch die laufende Nacht */
+    const base = l.h < 4 ? local(now - 12 * HOUR) : l; /* bis 04 Uhr zählt noch die laufende Nacht */
     const start = localTime(base.y, base.m, base.d + k, 16);
-    const end = start + 10 * HOUR; /* 16 bis 02 Uhr */
+    const end = start + 12 * HOUR; /* 16 bis 04 Uhr, so lange prüft auch der Push-Wecker */
     const ld = local(start + HOUR);
     const label = k === 0 ? 'Heute Nacht' : k === 1 ? 'Morgen Nacht' : k === -1 ? 'Letzte Nacht' : WD[new Date(Date.UTC(ld.y, ld.m - 1, ld.d)).getUTCDay()] + ' ' + String(ld.d).padStart(2, '0') + '.' + String(ld.m).padStart(2, '0') + '. Nacht';
     return { start: k === 0 ? Math.max(start, h0) : start, end, label, k, from: start };

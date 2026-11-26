@@ -266,6 +266,22 @@ details.more .inner { display: grid; gap: 0.8rem; }
 .ntfy { display: grid; gap: 0.35rem; border-top: 1px solid var(--line); padding-top: 0.6rem; }
 .ntfy .row { display: flex; gap: 0.4rem; }
 .ntfy input { flex: 1; min-width: 0; background: var(--raise); border: 1px solid var(--line); border-radius: 8px; padding: 0.4rem 0.55rem; color: var(--ink); font: inherit; }
+.merker { background: color-mix(in srgb, var(--chance) 7%, var(--surface)); border: 1px dashed color-mix(in srgb, var(--chance) 55%, var(--line)); border-radius: 14px; padding: 0.85rem 0.9rem; display: grid; gap: 0.6rem; scroll-margin-top: 1rem; }
+.merker h3 { font-size: 0.95rem; font-weight: 750; }
+.merker .merk { font-size: 0.88rem; padding: 0.55rem 0.7rem; border-radius: 10px; background: var(--raise); border-left: 3px solid var(--warn); }
+.merker code { font-family: var(--mono); font-size: 0.84em; background: var(--raise); border: 1px solid var(--line); border-radius: 5px; padding: 0 0.3rem; white-space: nowrap; }
+.merker .merk code { background: var(--surface); }
+.merker ol { margin: 0; padding-left: 1.3rem; display: grid; gap: 0.45rem; font-size: 0.86rem; }
+.merker ol li::marker { color: var(--chance); font-weight: 800; }
+/* Karte im Vollbild: per Fullscreen-API, sonst als feste Ebene über der Seite */
+.map-full { width: 34px; height: 34px; display: grid; place-items: center; padding: 0; background: #0C1220 !important; color: #E8EEF8; border: 1px solid #22304A !important; border-radius: 8px !important; cursor: pointer; }
+.map-full svg { width: 18px; height: 18px; }
+.red .map-full { background: #0D0000 !important; color: #F0453A; border-color: #3A0B07 !important; }
+.mapbox.full { position: fixed; inset: 0; z-index: 1500; border-radius: 0; border: 0; display: flex; flex-direction: column; background: var(--surface); }
+.mapbox.full #map { flex: 1 1 auto; height: auto; min-height: 0; }
+.mapbox.full .map-ctl { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.8rem); }
+.mapbox.full .howto, .mapbox.full .offline, .mapbox.full .mk-legend { display: none; }
+html.map-open, html.map-open body { overflow: hidden; }
 .foot { font-size: 0.74rem; color: var(--muted); display: grid; gap: 0.3rem; }
 </style>
 </head>
@@ -364,6 +380,18 @@ details.more .inner { display: grid; gap: 0.8rem; }
         <button type="button" class="go ghost" id="w-test">Probealarm</button>
       </div>
     </div>
+    <div class="merker" id="ntfy-merker">
+      <h3>Merker: ntfy richtig einrichten</h3>
+      <p class="merk"><b>Ein Thema, zwei Namen.</b> In der App ntfy abonniert ihr <b>nur euer Thema</b>, darüber kommen Alarm und Abend-Briefing. Das gleiche Thema mit <code>-status</code> am Ende bitte <b>nicht abonnieren</b>. Dorthin schickt der Wecker alle 10 Minuten stille Messwerte, die nur diese App liest. Abonniert, würde es ständig piepen.</p>
+      <ol>
+        <li>App <b>ntfy</b> aus dem Play Store installieren, auf beiden Handys.</li>
+        <li>In ntfy auf <b>+</b> tippen und euer Thema eintragen, genau so wie auf GitHub. Der Server bleibt <code>ntfy.sh</code>. Bietet ntfy „Instant delivery“ (Sofortzustellung) an, einschalten.</li>
+        <li><b>Damit der Alarm nachts durchkommt:</b> Benachrichtigungen von ntfy erlauben. Unter Einstellungen → Benachrichtigungen → Bitte nicht stören → Apps die App ntfy hinzufügen. In den App-Infos von ntfy den Akku auf „Nicht eingeschränkt“ stellen.</li>
+        <li>Oben im Feld dasselbe Thema eintragen und speichern, <b>ohne</b> <code>-status</code>. Die App hängt den Zusatz selbst an und zeigt dann abends die Magnetometer-Werte.</li>
+        <li><b>Test:</b> Auf GitHub unter Actions → Polarlicht-Wecker → Run workflow mit <code>test_push = 1</code> starten. Kommt nach kurzer Zeit eine Nachricht, passt alles.</li>
+      </ol>
+      <p class="small">Alarme kommen mit höchster Priorität und klingeln laut. Das Abend-Briefing gegen 17 Uhr kommt leise. Der Wecker auf GitHub startet am 03.01. von selbst.</p>
+    </div>
   </section>
 
   <details class="more sec" id="cam-box" open>
@@ -457,7 +485,7 @@ details.more .inner { display: grid; gap: 0.8rem; }
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="radar-core.js?v=7"></script>
+<script src="radar-core.js?v=8"></script>
 <script>
 (function () {
   'use strict';
@@ -947,6 +975,14 @@ details.more .inner { display: grid; gap: 0.8rem; }
     b.disabled = false; offState();
   }
   $('off-save').addEventListener('click', saveOffline);
+  /* Der Browser darf den Offline-Speicher ohne Rückfrage leeren. Dann stimmt „gespeichert“ nicht mehr. */
+  async function checkTiles() {
+    if (!store.get('tilesAt') || !('caches' in window)) return;
+    try {
+      const n = (await (await caches.open(TILE_CACHE)).keys()).length;
+      if (n < 250) { localStorage.removeItem('pr-tilesAt'); offState(); renderPrep(); }
+    } catch (e) { /* ohne Prüfung weiter */ }
+  }
 
   /* ---------- Technik ---------- */
   const kpWord = k => k >= 5 ? 'Sturm' : k >= 4 ? 'aktiv' : k >= 2 ? 'leicht aktiv' : 'ruhig';
@@ -1041,6 +1077,19 @@ details.more .inner { display: grid; gap: 0.8rem; }
     map.fog = L.tileLayer.wms('https://view.eumetsat.int/geoserver/ows', { layers: 'mtg_fd:rgb_fog', format: 'image/png', transparent: true, version: '1.3.0', opacity: 0.85, attribution: 'EUMETSAT' });
     map.obs = L.layerGroup().addTo(m);
     map.spots = L.layerGroup().addTo(m);
+    /* Knopf oben rechts: Karte im Vollbild */
+    const Full = L.Control.extend({
+      options: { position: 'topright' },
+      onAdd() {
+        const b = L.DomUtil.create('button', 'leaflet-bar map-full');
+        b.type = 'button'; b.setAttribute('aria-pressed', 'false');
+        L.DomEvent.disableClickPropagation(b);
+        L.DomEvent.on(b, 'click', e => { L.DomEvent.preventDefault(e); toggleFull(); });
+        map.fullBtn = b; fullIcon(false);
+        return b;
+      }
+    });
+    new Full().addTo(m);
     map.ready = true;
     const c = center(); m.setView([c.lat, c.lon], 9);
     explainMap();
@@ -1048,6 +1097,36 @@ details.more .inner { display: grid; gap: 0.8rem; }
     map.visible = !('IntersectionObserver' in window);
     if (!map.visible) new IntersectionObserver(es => { const v = es.some(e => e.isIntersecting); if (v && !map.visible) { map.visible = true; loadGrid(); } else map.visible = v; }, { rootMargin: '600px 0px' }).observe($('map'));
   }
+  /* ---------- Karte im Vollbild ---------- */
+  const ICON_OPEN = '<svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 7V2h5M11 2h5v5M16 11v5h-5M7 16H2v-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const ICON_CLOSE = '<svg viewBox="0 0 18 18" aria-hidden="true"><path d="M7 2v5H2M16 7h-5V2M11 16v-5h5M2 11h5v5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  function fullIcon(on) {
+    const b = map.fullBtn; if (!b) return;
+    b.innerHTML = on ? ICON_CLOSE : ICON_OPEN;
+    b.setAttribute('aria-pressed', String(on));
+    b.setAttribute('aria-label', on ? 'Vollbild beenden' : 'Karte im Vollbild');
+    b.title = on ? 'Vollbild beenden' : 'Karte im Vollbild';
+  }
+  function setFull(on) {
+    const box = document.querySelector('.mapbox');
+    box.classList.toggle('full', on);
+    document.documentElement.classList.toggle('map-open', on);
+    fullIcon(on);
+    setTimeout(() => { if (map.ready) map.m.invalidateSize(); }, 80);
+  }
+  async function toggleFull() {
+    const box = document.querySelector('.mapbox');
+    if (box.classList.contains('full')) {
+      if (document.fullscreenElement) { try { await document.exitFullscreen(); } catch (e) { /* schon zu */ } }
+      setFull(false); return;
+    }
+    setFull(true);
+    /* Echter Vollbildmodus, wo erlaubt (Android). Sonst bleibt die feste Ebene über der Seite. */
+    try { if (box.requestFullscreen) await box.requestFullscreen({ navigationUI: 'hide' }); } catch (e) { /* feste Ebene reicht */ }
+  }
+  document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && document.querySelector('.mapbox').classList.contains('full')) setFull(false); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.querySelector('.mapbox').classList.contains('full') && !document.fullscreenElement) setFull(false); });
+
   $('seg-layer').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b || !map.ready) return;
     map.layer = b.dataset.layer;
@@ -1065,7 +1144,7 @@ details.more .inner { display: grid; gap: 0.8rem; }
     else ramp.innerHTML = '';
     $('mk-legend').innerHTML = '<span><i style="background:' + LV_COL.gut + '"></i>gute Chance</span><span><i style="background:' + LV_COL.mittel + '"></i>mittel</span><span><i style="background:' + LV_COL.klein + '"></i>klein</span><span><span class="sq">3/8</span>Wetterstation</span><span><span class="sq" style="width:0.95rem">⌂</span>Unterkunft</span>';
     const H = {
-      cloud: ['<b>Dunkle Flächen = klarer Himmel.</b> Dort könnt ihr Polarlicht sehen. Weiße Flächen sind Wolken.', 'Mit dem Regler oder ▶ seht ihr, wohin die Wolken in den nächsten Stunden ziehen.', '<b>Der grün beschriftete Spot ist euer Ziel.</b> Tippt auf einen Spot für Chance und Temperatur.', 'Kästchen sind echte Messungen: 0/8 = wolkenlos, 8/8 = ganz bedeckt.'],
+      cloud: ['<b>Dunkle Flächen = klarer Himmel.</b> Dort könnt ihr Polarlicht sehen. Weiße Flächen sind Wolken.', 'Mit dem Regler oder ▶ seht ihr, wohin die Wolken in den nächsten Stunden ziehen.', '<b>Der grün beschriftete Spot ist euer Ziel.</b> Tippt auf einen Spot für Chance und Temperatur.', 'Kästchen sind echte Messungen: 0/8 = wolkenlos, 8/8 = ganz bedeckt.', '<b>Vollbild:</b> Knopf oben rechts in der Karte. Zurück mit demselben Knopf oder der Zurück-Geste.'],
       temp: ['<b>Farbe = Temperatur</b> in 2 m Höhe zur gewählten Stunde. Lila ist am kältesten.', 'Seen und Täler sind in klaren Nächten oft noch kälter als hier gezeigt.', 'Tippt auf einen Spot für die gefühlte Temperatur.'],
       ir: ['Aktuelles Infrarotbild des Wettersatelliten, alle 10 Minuten neu. Hohe Wolken erscheinen hell.', 'Lappland sieht der Satellit sehr flach von der Seite. Kalter Schnee und tiefe Wolken sehen fast gleich aus, deshalb nur zur Kontrolle.'],
       fog: ['Satellitenbild für Nebel und tiefe Wolken in der Nacht: Sie erscheinen grünlich bis türkis.', 'Bei 68° N nur grob, die Wolken-Ebene ist verlässlicher.']
@@ -1250,7 +1329,7 @@ details.more .inner { display: grid; gap: 0.8rem; }
     const items = [
       { id: 'tiles', ok: !!store.get('tilesAt'), t: 'Karte für Funklöcher gespeichert', h: 'Am besten jetzt im WLAN, auf beiden Handys.', btn: 'Jetzt speichern (3,9 MB)' },
       { id: 'gmaps', man: true, ok: !!man.gmaps, t: 'Google Maps: Offline-Karte für Lappland geladen', h: 'In Google Maps aufs Profilbild → Offlinekarten → Eigene Karte auswählen. Zwei Bereiche: rund um Rovaniemi und Sinettä, und von Hetta bis Kittilä. Im WLAN laden. Dann klappt „Route“ auch im Funkloch.' },
-      { id: 'ntfy', man: true, ok: !!man.ntfy, t: 'ntfy-App: Thema abonniert, Benachrichtigungen erlaubt', h: 'Für „Nicht stören“ freigeben, sonst weckt der Alarm nachts nicht. Auf beiden Handys.' },
+      { id: 'ntfy', man: true, ok: !!man.ntfy, t: 'ntfy-App: Thema abonniert, Benachrichtigungen erlaubt', h: 'Für „Nicht stören“ freigeben, sonst weckt der Alarm nachts nicht. Auf beiden Handys. Nur euer Thema abonnieren, nicht das mit „-status“.', btn: 'Anleitung' },
       { id: 'topic', ok: !!store.get('topic'), t: 'Dasselbe Thema hier in der App eingetragen', h: 'Unten beim Polarlicht-Wecker. Dann zeigt die App abends die Magnetometer-Werte.', btn: 'Zum Feld' },
       { id: 'home', man: !standalone, ok: standalone || !!man.home, t: 'App auf dem Home-Bildschirm', h: 'Im Browser-Menü „Zum Startbildschirm hinzufügen“. Dann startet sie auch ohne Netz.' }
     ];
@@ -1267,6 +1346,7 @@ details.more .inner { display: grid; gap: 0.8rem; }
     const b = e.target.closest('[data-prep-btn]'); if (!b) return;
     if (b.dataset.prepBtn === 'tiles') { b.disabled = true; b.textContent = 'Speichert …'; await saveOffline(); renderPrep(); }
     else if (b.dataset.prepBtn === 'topic') { $('w-topic').scrollIntoView({ block: 'center' }); $('w-topic').focus(); }
+    else if (b.dataset.prepBtn === 'ntfy') $('ntfy-merker').scrollIntoView({ block: 'start' });
   });
 
   /* ---------- Live-Kamera Kiruna (nur nachts, Bild erst auf Tipp) ---------- */
@@ -1337,7 +1417,7 @@ details.more .inner { display: grid; gap: 0.8rem; }
   }
 
   setRed(!!store.get('red'));
-  initMap(); gridSlider(true); offState();
+  initMap(); gridSlider(true); offState(); checkTiles();
   renderSeg(); render(); load(false); loadGrid();
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => { /* ohne Offline-Modus */ });
   setInterval(() => { if (!document.hidden && !watch.on) { load(false); loadGrid(); } }, 15 * 60e3);
