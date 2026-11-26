@@ -64,7 +64,7 @@ const om = 'latitude=' + la + '&longitude=' + lo + '&past_days=1&forecast_days=3
 const iso = ms => new Date(ms).toISOString().replace(/\.\d+Z$/, 'Z');
 
 const [det, ens, kpRaw, ovRaw, mag, obsXml, rmap, k1m] = await Promise.all([
-  safe(get('https://api.open-meteo.com/v1/forecast?' + om + '&hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high,temperature_2m,apparent_temperature,wind_speed_10m&models=metno_seamless')),
+  safe(get('https://api.open-meteo.com/v1/forecast?' + om + '&hourly=cloud_cover_low,cloud_cover_mid,cloud_cover_high,temperature_2m,apparent_temperature,wind_speed_10m,snowfall,wind_gusts_10m&models=metno_seamless')),
   safe(get('https://ensemble-api.open-meteo.com/v1/ensemble?' + om + '&hourly=cloud_cover&models=ecmwf_ifs025,icon_seamless', 'json', 45000)),
   safe(get('https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json')),
   safe(get('https://services.swpc.noaa.gov/json/ovation_aurora_latest.json', 'json', 45000)),
@@ -103,8 +103,20 @@ const run = (win, withMagnet) => R.evaluate({ locs, det: DET, ens: ENS, kp, ov, 
 const pct = v => v == null ? '–' : v < 0.05 ? 'unter 5 %' : Math.round(v * 20) * 5 + ' %';
 const deg = v => v == null || !isFinite(v) ? '–' : (Math.round(v) < 0 ? '−' : '') + Math.abs(Math.round(v)) + ' °C';
 const hh = t => String(R.local(t).h).padStart(2, '0');
+const clock = t => { const l = R.local(Math.round(t / 600e3) * 600e3); return String(l.h).padStart(2, '0') + ':' + String(l.min).padStart(2, '0'); };
 const where = l => l.name + ' (' + R.howText(l) + ')';
 const actionsFor = l => [].concat(l && l.min > 0 ? [{ action: 'view', label: 'Route', url: R.mapsUrl(l) }] : [], SITE ? [{ action: 'view', label: 'App öffnen', url: SITE }] : []);
+
+/* ---------- 0. Stille Statusmeldung für die App: Magnetometer-Werte ----------
+   Thema = NTFY_TOPIC + "-status". Die Handys abonnieren es nicht, nur die App liest es (ntfy erlaubt Abrufe aus dem Browser). */
+async function status() {
+  const payload = { v: 1, t: now, base, fmi: fmi.map(s => [s.name, s.label, s.r, Math.round(s.km)]), p: actNow ? Math.round(actNow.p * 100) / 100 : null };
+  if (env.DRY_RUN || !env.NTFY_TOPIC) { console.log('Status (nicht gesendet):', JSON.stringify(payload)); return; }
+  try {
+    const r = await fetch(NTFY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ topic: env.NTFY_TOPIC + '-status', message: JSON.stringify(payload), priority: 1, tags: ['status'] }) });
+    console.log('Status an die App, ntfy:', r.status);
+  } catch (e) { console.log('Status nicht gesendet:', e.message); }
+}
 
 /* ---------- 1. Abend-Briefing ---------- */
 async function briefing() {
@@ -127,6 +139,12 @@ async function briefing() {
     if (t.best) lines.push('Am besten ' + hh(t.best.t) + ' Uhr' + (span && span.to - span.from > R.HOUR ? ', gut von ' + hh(span.from) + ' bis ' + hh(span.to) + ' Uhr' : '') + '.');
   } else lines.push((lv.key === 'klein' ? 'Ein Blick nach Norden lohnt, wenn ihr ohnehin wach seid. ' : '') + 'Bester Spot: ' + t.loc.name + (t.best ? ', ' + hh(t.best.t) + ' Uhr' : '') + '.');
   if (rec.far) lines.push('In der Nähe höchstens ' + pct(rec.near.chance) + ' (' + rec.near.loc.name + '), deshalb die längere Fahrt.');
+  const plan = go && t.loc.min >= 30 ? R.tripPlan(t, rec.home) : null;
+  if (plan) {
+    lines.push('Losfahren gegen ' + clock(plan.go) + ', zurück gegen ' + clock(plan.back) + '.');
+    if (plan.snow >= 0.3) lines.push('Unterwegs Schneefall möglich.');
+    if (plan.gust >= 50) lines.push('Böen bis ' + Math.round(plan.gust) + ' km/h.');
+  }
   lines.push('Himmel ' + R.skyWord(t.pClear) + ' (' + pct(t.pClear) + '), Polarlicht ' + R.auroraWord(t.pAur) + '.');
   if (t.feelsMin != null) lines.push('Gefühlt bis ' + deg(t.feelsMin) + '.');
   const mo = t.best && t.best.moon; if (mo && mo.light >= 0.3) lines.push('Mond: ' + R.moonWord(mo).text + '.');
@@ -171,5 +189,6 @@ async function alarm() {
   await send({ title, message, priority: 5, tags: ['milky_way', 'polarlicht'].concat(fmiHigh ? ['stark'] : []), actions: actionsFor(target.loc) });
 }
 
+await status();
 await briefing();
 await alarm();
